@@ -7,20 +7,15 @@ import "./tools/get_current_time.js";
 const app = express();
 app.use(express.json());
 
+// Create handler once
+const handler = webhookCallback(bot, "express");
+
 // Endpoint for Telegram Webhook
-// We cast to any because grammy's express handler signature can be tricky with Firebase/Express types
-app.post("/webhook", async (req: Request, res: Response) => {
-    logger.info("Received Webhook from Telegram");
-    try {
-        const handler = webhookCallback(bot, "express");
-        await (handler as any)(req, res);
-    } catch (err) {
-        logger.error("Error in webhook handler", err);
-        if (!res.headersSent) {
-            res.status(200).send("OK");
-        }
-    }
+app.post("/webhook", (req: Request, res: Response) => {
+    logger.info(`Received Webhook from Telegram! Body: ${JSON.stringify(req.body?.message?.text || req.body)}`);
+    (handler as any)(req, res).catch((err: any) => logger.error("Webhook error:", err));
 });
+
 
 // Health check endpoint
 app.get("/", (req: Request, res: Response) => {
