@@ -20,6 +20,8 @@ export const config = {
   DB_PATH: getEnv('DB_PATH', false, './memory.db'),
   GOOGLE_APPLICATION_CREDENTIALS: getEnv('GOOGLE_APPLICATION_CREDENTIALS', false, './service-account.json'),
   ELEVENLABS_API_KEY: getEnv('ELEVENLABS_API_KEY', false),
-  ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'IKne3meq5aSn9XLyUdCD'), // Charlie - Deep, Confident, Energetic
+  ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'IKne3meq5aSn9XLyUdCD'),
+  IS_LOCAL: getEnv('IS_LOCAL', false, 'false').toLowerCase() === 'true',
+  LOCAL_TTS_URL: getEnv('LOCAL_TTS_URL', false, 'http://localhost:5001'),
   MAX_ITERATIONS: 10,
 };

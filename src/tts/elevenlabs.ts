@@ -3,6 +3,8 @@ import { logger } from '../utils/logger.js';
 
 const ELEVENLABS_API_KEY = config.ELEVENLABS_API_KEY;
 const VOICE_ID = config.ELEVENLABS_VOICE_ID;
+const IS_LOCAL = config.IS_LOCAL;
+const LOCAL_TTS_URL = config.LOCAL_TTS_URL;
 
 interface UserVoiceSettings {
   enabled: boolean;
@@ -30,11 +32,43 @@ export function getVoiceSettings(userId: string): UserVoiceSettings {
 }
 
 export async function textToSpeech(text: string): Promise<Buffer | null> {
+  if (IS_LOCAL) {
+    const localAudio = await localTTS(text);
+    if (localAudio) return localAudio;
+    logger.warn('Local TTS failed, falling back to Coqui API');
+    return coquiTTS(text);
+  }
+
   const audioBuffer = await elevenLabsTTS(text);
   if (audioBuffer) return audioBuffer;
 
   logger.warn('Falling back to Coqui TTS');
   return coquiTTS(text);
+}
+
+async function localTTS(text: string): Promise<Buffer | null> {
+  try {
+    const response = await fetch(`${LOCAL_TTS_URL}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language: 'es' }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error(`Local TTS error: ${response.status} - ${error}`);
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.audio) {
+      return Buffer.from(result.audio, 'base64');
+    }
+    return null;
+  } catch (error) {
+    logger.error('Error connecting to local TTS server:', error);
+    return null;
+  }
 }
 
 async function elevenLabsTTS(text: string): Promise<Buffer | null> {
@@ -113,7 +147,7 @@ async function coquiTTS(text: string): Promise<Buffer | null> {
 }
 
 export function isConfigured(): boolean {
-  return !!ELEVENLABS_API_KEY;
+  return !!ELEVENLABS_API_KEY || IS_LOCAL;
 }
 
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
