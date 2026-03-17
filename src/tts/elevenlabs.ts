@@ -75,3 +75,42 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
 export function isConfigured(): boolean {
   return !!ELEVENLABS_API_KEY;
 }
+
+export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
+  if (!ELEVENLABS_API_KEY) {
+    logger.warn('ElevenLabs API key not configured for transcription');
+    return null;
+  }
+
+  try {
+    const uint8Array = new Uint8Array(audioBuffer);
+    const blob = new Blob([uint8Array], { type: 'audio/ogg' });
+    
+    const formData = new FormData();
+    formData.append('file', blob, 'audio.ogg');
+    formData.append('model_id', 'scribe_multilingual');
+
+    const response = await fetch(
+      'https://api.elevenlabs.io/v1/transcription',
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error(`ElevenLabs transcription error: ${response.status} - ${error}`);
+      return null;
+    }
+
+    const result = await response.json();
+    return result.text || null;
+  } catch (error) {
+    logger.error('Error transcribing audio with ElevenLabs:', error);
+    return null;
+  }
+}

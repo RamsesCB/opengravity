@@ -2,8 +2,8 @@ import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
-import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
-import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
+import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured, transcribeAudio as elevenTranscribe } from '../tts/elevenlabs.js';
+import { isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
 import { tmpdir } from 'os';
 import { writeFile, unlink } from 'fs/promises';
 
@@ -47,8 +47,12 @@ bot.command('transcribe', async (ctx) => {
       return;
     }
     
-    const transcription = await transcribeAudio(audioBuffer);
-    await ctx.reply(`📝 Transcripción:\n\n${transcription}`);
+    const transcription = await elevenTranscribe(audioBuffer);
+    if (transcription) {
+      await ctx.reply(`📝 Transcripción:\n\n${transcription}`);
+    } else {
+      await ctx.reply('No pude transcribir el audio. Intenta de nuevo.');
+    }
   } catch (error) {
     logger.error('Error transcribing voice:', error);
     await ctx.reply('Error al transcribir el audio. Intenta de nuevo.');
@@ -164,7 +168,12 @@ bot.on('message:voice', async (ctx) => {
       return;
     }
     
-    const transcription = await transcribeAudio(audioBuffer);
+    const transcription = await elevenTranscribe(audioBuffer);
+    
+    if (!transcription) {
+      await ctx.reply('No pude transcribir el audio. Intenta de nuevo.');
+      return;
+    }
     
     // Process the transcribed text with the LLM
     const reply = await processUserMessage(userId, transcription);
