@@ -51,6 +51,3 @@ export function formatAudioSize(sizeBytes: number): string {
     const sizeMB = sizeBytes / (1024 * 1024);
     return `${sizeMB.toFixed(2)} MB`;
 }
-
-// Dummy for backward compatibility
-export async function unloadWhisper(): Promise<void> {}

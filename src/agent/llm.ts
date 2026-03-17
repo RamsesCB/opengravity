@@ -2,14 +2,7 @@ import Groq from 'groq-sdk';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
-let groq: Groq;
-try {
-  groq = new Groq({
-    apiKey: config.GROQ_API_KEY,
-  });
-} catch (error) {
-  console.warn("GROQ_API_KEY not configured or invalid.");
-}
+const groq = config.GROQ_API_KEY ? new Groq({ apiKey: config.GROQ_API_KEY }) : null;
 
 function convertToGeminiFormat(messages: any[], systemPrompt?: string): { contents: any[], systemInstruction?: any } {
   const contents: any[] = [];
@@ -19,15 +12,10 @@ function convertToGeminiFormat(messages: any[], systemPrompt?: string): { conten
     if (msg.role === 'system') {
       systemInstructionText = msg.content;
     } else if (msg.role === 'user') {
-      contents.push({
-        role: 'user',
-        parts: [{ text: msg.content }]
-      });
+      contents.push({ role: 'user', parts: [{ text: msg.content }] });
     } else if (msg.role === 'assistant') {
       const parts: any[] = [];
-      if (msg.content) {
-        parts.push({ text: msg.content });
-      }
+      if (msg.content) parts.push({ text: msg.content });
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls) {
           parts.push({
@@ -38,67 +26,45 @@ function convertToGeminiFormat(messages: any[], systemPrompt?: string): { conten
           });
         }
       }
-      if (parts.length > 0) {
-        contents.push({ role: 'model', parts });
-      }
+      if (parts.length > 0) contents.push({ role: 'model', parts });
     } else if (msg.role === 'tool') {
-      // Gemini uses 'function' role for tool responses
       contents.push({
         role: 'function',
-        parts: [{ 
-          functionResponse: {
-            name: msg.name,
-            response: { result: msg.content }
-          }
-        }]
+        parts: [{ functionResponse: { name: msg.name, response: { result: msg.content } } }]
       });
     }
   }
 
   const result: any = { contents };
-
   if (systemInstructionText) {
-    result.systemInstruction = {
-      parts: [{ text: systemInstructionText }]
-    };
+    result.systemInstruction = { parts: [{ text: systemInstructionText }] };
   }
-
   return result;
 }
 
 async function callGemini(messages: any[], tools?: any[]): Promise<any> {
-  if (!config.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY not configured");
-  }
+  if (!config.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
   logger.info("Attempting Gemini API...");
-
   const geminiBody = convertToGeminiFormat(messages);
   
   const requestBody: any = {
     ...geminiBody,
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 8192,
-    }
+    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
   };
 
-  if (tools && tools.length > 0) {
-    const toolDeclarations = tools.map(tool => ({
+  if (tools?.length) {
+    requestBody.tools = [{ functionDeclarations: tools.map(tool => ({
       name: tool.function.name,
       description: tool.function.description,
       parameters: tool.function.parameters
-    }));
-    requestBody.tools = [{ functionDeclarations: toolDeclarations }];
+    })) }];
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.GEMINI_API_KEY}`;
-
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody)
   });
 
@@ -108,51 +74,29 @@ async function callGemini(messages: any[], tools?: any[]): Promise<any> {
   }
 
   const data = await response.json();
+  const candidate = data.candidates?.[0];
+  const parts = candidate?.content?.parts;
 
-  if (!data.candidates || !data.candidates[0]) {
-    throw new Error("Gemini returned no candidates");
+  if (!parts?.length) throw new Error("Gemini returned no candidates");
+
+  const responseMessage: any = { role: 'assistant', content: '' };
+  if (parts[0].text) {
+    responseMessage.content = parts[0].text;
+  } else if (parts[0].functionCall) {
+    responseMessage.tool_calls = [{
+      id: `call_${Date.now()}`,
+      type: 'function',
+      function: { name: parts[0].functionCall.name, arguments: parts[0].functionCall.arguments }
+    }];
   }
 
-  const candidate = data.candidates[0];
-  const parts = candidate.content.parts;
-
-  const responseMessage: any = {
-    role: 'assistant',
-    content: ''
-  };
-
-  if (parts && parts.length > 0) {
-    if (parts[0].text) {
-      responseMessage.content = parts[0].text;
-    } else if (parts[0].functionCall) {
-      responseMessage.tool_calls = [{
-        id: `call_${Date.now()}`,
-        type: 'function',
-        function: {
-          name: parts[0].functionCall.name,
-          arguments: parts[0].functionCall.arguments
-        }
-      }];
-    }
-  }
-
-  return {
-    choices: [{ message: responseMessage }]
-  };
+  return { choices: [{ message: responseMessage }] };
 }
 
 async function callOpenRouter(messages: any[], tools?: any[]): Promise<any> {
-  if (!config.OPENROUTER_API_KEY) {
-    throw new Error("OPENROUTER_API_KEY not configured");
-  }
+  if (!config.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
 
   logger.info(`Using OpenRouter with model: ${config.OPENROUTER_MODEL}`);
-
-  // Ensure system prompt is explicitly set for OpenRouter models
-  const apiMessages = [...messages];
-  // If no system prompt is at the start and we know we need one, we could force it, 
-  // but loop.js already pre-pends `{ role: 'system', content: systemPrompt }`
-  
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -162,9 +106,9 @@ async function callOpenRouter(messages: any[], tools?: any[]): Promise<any> {
       "X-Title": "OpenGravity Bot"
     },
     body: JSON.stringify({
-      model: config.OPENROUTER_MODEL || "google/gemini-flash-1.5-8b",
-      messages: apiMessages,
-      tools: (tools && tools.length > 0) ? tools : undefined,
+      model: config.OPENROUTER_MODEL,
+      messages,
+      tools: tools?.length ? tools : undefined,
       temperature: 0.1
     })
   });
@@ -174,36 +118,24 @@ async function callOpenRouter(messages: any[], tools?: any[]): Promise<any> {
     throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
   }
 
-  return await response.json();
+  return response.json();
 }
 
 export async function chatCompletion(messages: any[], tools?: any[]): Promise<any> {
-  const model = "llama-3.3-70b-versatile";
-
-  if (groq && config.GROQ_API_KEY) {
+  if (groq) {
     try {
       logger.info("Attempting Groq API...");
-      const options: any = {
+      return await groq.chat.completions.create({
         messages,
-        model,
+        model: "llama-3.3-70b-versatile",
         temperature: 0.1,
-      };
-
-      if (tools && tools.length > 0) {
-        options.tools = tools;
-        options.tool_choice = "auto";
-      }
-
-      return await groq.chat.completions.create(options);
+        tools: tools?.length ? tools : undefined,
+        tool_choice: tools?.length ? "auto" : undefined
+      });
     } catch (error: any) {
-      const isRateLimit = error.status === 429;
-      const isUnavailable = error.status === 503 || error.message?.includes('unavailable');
-
-      if (isRateLimit || isUnavailable) {
-        logger.warn(`Groq failed (${error.status}). Attempting Gemini fallback...`);
-      } else {
-        logger.warn(`Groq error: ${error.message}. Attempting Gemini fallback...`);
-      }
+      const isRetryable = error.status === 429 || error.status === 503 || error.message?.includes('unavailable');
+      logger.warn(`Groq failed (${error.status || error.message}). Trying fallback...`);
+      if (!isRetryable && !config.GEMINI_API_KEY && !config.OPENROUTER_API_KEY) throw error;
     }
   }
 
