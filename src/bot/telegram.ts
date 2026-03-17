@@ -2,34 +2,17 @@ import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
-import { textToSpeech as elevenTTS, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
-import { textToSpeechGoogle, isGoogleTTSConfigured } from '../tts/google.js';
+import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
 import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
 import { tmpdir } from 'os';
 import { writeFile, unlink } from 'fs/promises';
-
-async function generateVoice(text: string): Promise<Buffer | null> {
-  // Try ElevenLabs first
-  if (isConfigured()) {
-    const audio = await elevenTTS(text);
-    if (audio) return audio;
-  }
-  
-  // Fallback to Google TTS
-  if (isGoogleTTSConfigured()) {
-    const audio = await textToSpeechGoogle(text);
-    if (audio) return audio;
-  }
-  
-  return null;
-}
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
 // Auth middleware
 bot.use(async (ctx, next) => {
   const userId = ctx.from?.id.toString();
-  if (!userId) return; // Ignore updates without user
+  if (!userId) return;
 
   if (!config.TELEGRAM_ALLOWED_USER_IDS.includes(userId)) {
     logger.warn(`Unauthorized access attempt from User ID: ${userId}`);
@@ -65,7 +48,7 @@ bot.command('transcribe', async (ctx) => {
     }
     
     const transcription = await transcribeAudio(audioBuffer);
-    if (transcription && !transcription.includes('Error al transcribir')) {
+    if (transcription) {
       await ctx.reply(`📝 Transcripción:\n\n${transcription}`);
     } else {
       await ctx.reply('No pude transcribir el audio. Intenta de nuevo.');
@@ -123,7 +106,7 @@ bot.command('hablar', async (ctx) => {
     return;
   }
   
-  const args = ctx.message.text.split(' ').slice(1);
+  const args = message.text.split(' ').slice(1);
   const text = args.join(' ');
   
   if (!text) {
@@ -134,7 +117,7 @@ bot.command('hablar', async (ctx) => {
   await ctx.reply('🎤 Generando audio...');
   
   try {
-    const audioBuffer = await generateVoice(text);
+    const audioBuffer = await textToSpeech(text);
     if (audioBuffer) {
       const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
       await writeFile(tempFile, audioBuffer);
@@ -151,7 +134,7 @@ bot.command('hablar', async (ctx) => {
 
 async function sendVoiceReply(ctx: any, text: string) {
   try {
-    const audioBuffer = await generateVoice(text);
+    const audioBuffer = await textToSpeech(text);
     if (audioBuffer) {
       const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
       await writeFile(tempFile, audioBuffer);
@@ -166,8 +149,9 @@ async function sendVoiceReply(ctx: any, text: string) {
 }
 
 bot.on('message:voice', async (ctx) => {
-  const userId = ctx.from.id.toString();
-  const voice = ctx.message.voice;
+  const userId = ctx.from?.id.toString() || '';
+  const voice = ctx.message?.voice;
+  if (!voice) return;
   
   logger.info(`Received voice message from ${userId}`);
   
@@ -181,18 +165,17 @@ bot.on('message:voice', async (ctx) => {
     const audioBuffer = Buffer.from(await response.arrayBuffer());
     
     if (!isAudioSizeValid(audioBuffer.length)) {
-      await ctx.reply(`El audio es muy grande (${formatAudioSize(audioBuffer.length)}). Máximo 20MB. Envía /transcribe para una transcripción más detallada.`);
+      await ctx.reply(`El audio es muy grande (${formatAudioSize(audioBuffer.length)}). Máximo 20MB.`);
       return;
     }
     
     const transcription = await transcribeAudio(audioBuffer);
     
-    if (!transcription || transcription.includes('Error al transcribir')) {
+    if (!transcription) {
       await ctx.reply('No pude transcribir el audio. Intenta de nuevo.');
       return;
     }
     
-    // Process the transcribed text with the LLM
     const reply = await processUserMessage(userId, transcription);
     
     if (reply) {
@@ -209,7 +192,6 @@ bot.on('message:voice', async (ctx) => {
   }
 });
 
-// Ignore other commands manually for now or pass them to the LLM
 bot.on('message:text', async (ctx) => {
   const userId = ctx.from?.id.toString() || '';
   const message = ctx.message;
@@ -219,7 +201,6 @@ bot.on('message:text', async (ctx) => {
 
   logger.info(`Received message from ${userId}: ${text}`);
 
-  // Typing indicator
   await ctx.api.sendChatAction(ctx.chat.id, 'typing');
 
   try {
