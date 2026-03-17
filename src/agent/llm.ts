@@ -11,13 +11,13 @@ try {
   console.warn("GROQ_API_KEY not configured or invalid.");
 }
 
-function convertToGeminiFormat(messages: any[], systemPrompt?: string): any {
+function convertToGeminiFormat(messages: any[], systemPrompt?: string): { contents: any[], systemInstruction?: any } {
   const contents: any[] = [];
-  let systemInstruction = "";
+  let systemInstructionText = systemPrompt || "";
 
   for (const msg of messages) {
     if (msg.role === 'system') {
-      systemInstruction = msg.content;
+      systemInstructionText = msg.content;
     } else if (msg.role === 'user') {
       contents.push({
         role: 'user',
@@ -33,7 +33,7 @@ function convertToGeminiFormat(messages: any[], systemPrompt?: string): any {
           parts.push({
             functionCall: {
               name: tc.function.name,
-              arguments: tc.function.arguments
+              args: tc.function.arguments ? JSON.parse(tc.function.arguments) : {}
             }
           });
         }
@@ -42,25 +42,28 @@ function convertToGeminiFormat(messages: any[], systemPrompt?: string): any {
         contents.push({ role: 'model', parts });
       }
     } else if (msg.role === 'tool') {
+      // Gemini uses 'function' role for tool responses
       contents.push({
-        role: 'user',
-        parts: [{ text: msg.content }]
+        role: 'function',
+        parts: [{ 
+          functionResponse: {
+            name: msg.name,
+            response: { result: msg.content }
+          }
+        }]
       });
     }
   }
 
-  const geminiMsg: any = {
-    contents
-  };
+  const result: any = { contents };
 
-  if (systemInstruction) {
-    geminiMsg.systemInstruction = {
-      role: 'user',
-      parts: [{ text: systemInstruction }]
+  if (systemInstructionText) {
+    result.systemInstruction = {
+      parts: [{ text: systemInstructionText }]
     };
   }
 
-  return geminiMsg;
+  return result;
 }
 
 async function callGemini(messages: any[], tools?: any[]): Promise<any> {
@@ -145,6 +148,11 @@ async function callOpenRouter(messages: any[], tools?: any[]): Promise<any> {
 
   logger.info(`Using OpenRouter with model: ${config.OPENROUTER_MODEL}`);
 
+  // Ensure system prompt is explicitly set for OpenRouter models
+  const apiMessages = [...messages];
+  // If no system prompt is at the start and we know we need one, we could force it, 
+  // but loop.js already pre-pends `{ role: 'system', content: systemPrompt }`
+  
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -155,7 +163,7 @@ async function callOpenRouter(messages: any[], tools?: any[]): Promise<any> {
     },
     body: JSON.stringify({
       model: config.OPENROUTER_MODEL || "google/gemini-flash-1.5-8b",
-      messages,
+      messages: apiMessages,
       tools: (tools && tools.length > 0) ? tools : undefined,
       temperature: 0.1
     })
