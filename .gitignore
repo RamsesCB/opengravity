@@ -8,3 +8,9 @@ firebase-debug.log
 *.log
 .DS_Store
 models/
+server.js
+*.mp3
+*.wav
+*.ogg
+temp/
+tmp/
