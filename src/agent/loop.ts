@@ -79,8 +79,11 @@ export async function processUserMessage(userId: string, content: string): Promi
       } else {
         // No tool calls, final response
         let finalContent = resMessage.content || "";
-        // Clean up Llama3 tool leak artifacts
-        finalContent = finalContent.replace(/<function=.*?>.*?<\/function>/gis, '').trim();
+        // Aggressively clean up Llama3 tool leak artifacts (tags like <function=...>, </function>, etc.)
+        finalContent = finalContent
+          .replace(/<function=.*?>|<\/function>|<tool_code>|<\/tool_code>|<tool_call>|<\/tool_call>/gis, '')
+          .trim();
+
         await memory.addMessage(userId, 'assistant', finalContent);
         return finalContent;
       }
