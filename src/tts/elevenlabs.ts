@@ -3,7 +3,6 @@ import { logger } from '../utils/logger.js';
 
 const ELEVENLABS_API_KEY = config.ELEVENLABS_API_KEY;
 const VOICE_ID = config.ELEVENLABS_VOICE_ID;
-const OPENAI_API_KEY = config.OPENAI_API_KEY;
 
 interface UserVoiceSettings {
   enabled: boolean;
@@ -34,8 +33,8 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
   const audioBuffer = await elevenLabsTTS(text);
   if (audioBuffer) return audioBuffer;
 
-  logger.warn('Falling back to OpenAI TTS');
-  return openaiTTS(text);
+  logger.warn('Falling back to Coqui TTS');
+  return coquiTTS(text);
 }
 
 async function elevenLabsTTS(text: string): Promise<Buffer | null> {
@@ -81,39 +80,34 @@ async function elevenLabsTTS(text: string): Promise<Buffer | null> {
   }
 }
 
-async function openaiTTS(text: string): Promise<Buffer | null> {
-  if (!OPENAI_API_KEY) {
-    logger.warn('OpenAI API key not configured, TTS unavailable');
-    return null;
-  }
-
+async function coquiTTS(text: string): Promise<Buffer | null> {
   try {
     const response = await fetch(
-      'https://api.openai.com/v1/audio/speech',
+      'https://api.coqui.ai/v2/tts',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'tts-1',
-          voice: 'alloy',
-          input: text,
+          model_id: 'coqui/xtts',
+          text: text,
+          language: 'es',
         }),
       }
     );
 
     if (!response.ok) {
       const error = await response.text();
-      logger.error(`OpenAI TTS error: ${response.status} - ${error}`);
+      logger.error(`Coqui TTS error: ${response.status} - ${error}`);
       return null;
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const audioBase64 = await response.text();
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    return audioBuffer;
   } catch (error) {
-    logger.error('Error generating speech with OpenAI:', error);
+    logger.error('Error generating speech with Coqui:', error);
     return null;
   }
 }
