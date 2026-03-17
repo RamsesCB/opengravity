@@ -57,7 +57,7 @@ TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_ALLOWED_USER_IDS=123456789
 GROQ_API_KEY=your_groq_api_key
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
-ELEVENLABS_VOICE_ID=jsCqWAovK14vIlaW1p
+ELEVENLABS_VOICE_ID=IKne3meq5aSn9XLyUdCD
 ```
 
 ## Deployment
