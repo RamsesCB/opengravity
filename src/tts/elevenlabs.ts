@@ -13,12 +13,12 @@ const userVoiceSettings = new Map<string, UserVoiceSettings>();
 
 export function isVoiceEnabled(userId: string): boolean {
   const settings = userVoiceSettings.get(userId);
-  return settings?.enabled ?? false;
+  return settings?.enabled ?? isConfigured();
 }
 
 export function isAutoRespondEnabled(userId: string): boolean {
   const settings = userVoiceSettings.get(userId);
-  return settings?.autoRespond ?? false;
+  return settings?.autoRespond ?? isConfigured();
 }
 
 export function setVoiceEnabled(userId: string, enabled: boolean, autoRespond = false): void {
@@ -26,7 +26,7 @@ export function setVoiceEnabled(userId: string, enabled: boolean, autoRespond = 
 }
 
 export function getVoiceSettings(userId: string): UserVoiceSettings {
-  return userVoiceSettings.get(userId) || { enabled: false, autoRespond: false };
+  return userVoiceSettings.get(userId) || { enabled: isConfigured(), autoRespond: isConfigured() };
 }
 
 export async function textToSpeech(text: string): Promise<Buffer | null> {
