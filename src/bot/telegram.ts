@@ -166,11 +166,20 @@ bot.on('message:voice', async (ctx) => {
     
     const transcription = await transcribeAudio(audioBuffer);
     
-    await ctx.reply(`🎤 Transcripción:\n\n${transcription}\n\n¿quieres que procese esto con la IA?`);
+    // Process the transcribed text with the LLM
+    const reply = await processUserMessage(userId, transcription);
+    
+    if (reply) {
+      if (isAutoRespondEnabled(userId) && isVoiceEnabled(userId)) {
+        await sendVoiceReply(ctx, reply);
+      } else {
+        await ctx.reply(reply);
+      }
+    }
     
   } catch (error) {
     logger.error('Error handling voice message:', error);
-    await ctx.reply("Error al transcribir el audio. Intenta de nuevo o usa /transcribe.");
+    await ctx.reply("Error al procesar el audio. Intenta de nuevo.");
   }
 });
 
