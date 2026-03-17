@@ -21,7 +21,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 ### Why OpenGRBC?
 
 - **Resilient**: Triple LLM fallback (Groq → Gemini Flash → OpenRouter)
-- **Voice-Ready**: Full voice message support with ElevenLabs TTS
+- **Voice-Ready**: Full voice message support with ElevenLabs or Qwen3-TTS (local)
 - **Memory**: Persistent conversation history via Firebase Firestore
 - **Secure**: Whitelist-based access control
 - **Production-Ready**: Deploy to Render, Firebase Functions, or any cloud
@@ -34,7 +34,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 |---------|-------------|
 | 🤖 **Triple LLM Fallback** | Groq → Gemini Flash → OpenRouter automatic failover |
 | 🎤 **Voice Messages** | Send voice, receive voice responses |
-| 🔊 **ElevenLabs TTS** | High-quality text-to-speech with custom voices |
+| 🔊 **TTS Options** | ElevenLabs API or Qwen3-TTS (local, free, custom voice) |
 | 💾 **Persistent Memory** | Firebase Firestore stores conversation history |
 | 🔒 **Access Control** | Whitelist-only user access |
 | 📝 **Tool Calling** | Execute functions and tools via AI |
@@ -70,11 +70,22 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 │   └──────────────┘      │  - User Context                   │  │
 │                         └────────────────────────────────────┘  │
 │                                                                  │
-│   ┌──────────────┐      ┌────────────────────────────────────┐  │
-│   │  ElevenLabs  │◄─────│         Voice Layer               │  │
-│   │     TTS      │      │  - Whisper Transcription           │  │
-│   └──────────────┘      │  - ElevenLabs Synthesis            │  │
-│                         └────────────────────────────────────┘  │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │                    Voice Layer                            │  │
+│   ├──────────────────────────────────────────────────────────┤  │
+│   │  ┌─────────────────┐    ┌─────────────────────────────┐  │  │
+│   │  │  ElevenLabs    │    │   Qwen3-TTS (Local)         │  │  │
+│   │  │     API        │    │   - Voice Design (free)     │  │  │
+│   │  │  (cloud)       │    │   - Custom prompts         │  │  │
+│   │  └────────┬────────┘    └──────────────┬──────────────┘  │  │
+│   │           │                              │                  │  │
+│   │           └──────────────┬──────────────┘                  │  │
+│   │                          ▼                                 │  │
+│   │              ┌─────────────────────┐                      │  │
+│   │              │  Whisper (Groq API) │                      │  │
+│   │              │   Transcription     │                      │  │
+│   │              └─────────────────────┘                      │  │
+│   └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,7 +100,33 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 | **Google Gemini** | Secondary fallback | Optional |
 | **OpenRouter** | Tertiary fallback | Optional |
 | **Firebase** | Database & auth | ✅ Yes |
-| **ElevenLabs** | Voice synthesis | Optional |
+| **ElevenLabs** | Voice synthesis (cloud) | Optional |
+| **Qwen3-TTS** | Voice synthesis (local, free) | Optional (requires GPU) |
+
+---
+
+## 🎤 Voice Configuration
+
+OpenGRBC supports **two voice (TTS) options**:
+
+### Option A: ElevenLabs API (Cloud)
+
+| Pros | Cons |
+|------|------|
+| ✅ Easy setup | ❌ Can be blocked on cloud platforms (Render) |
+| ✅ No local setup | ❌ Limited free tier |
+| ✅ High quality | ❌ Requires API key |
+
+**Warning:** ElevenLabs may block accounts when deployed to cloud platforms like Render due to datacenter IP detection. If this happens, use **Option B**.
+
+### Option B: Qwen3-TTS Local (Recommended)
+
+| Pros | Cons |
+|------|------|
+| ✅ 100% Free & Open Source | ❌ Requires GPU (4GB+ VRAM) |
+| ✅ Custom voice with prompts | ❌ Local setup required |
+| ✅ No cloud dependency | ❌ Only works when running locally |
+| ✅ No account/API needed | |
 
 ---
 
@@ -107,6 +144,17 @@ cd OpenGRBC
 ```bash
 npm install
 ```
+
+### 3. Choose Your Voice Mode
+
+#### Option A: ElevenLabs (Cloud)
+Add to your `.env`:
+```env
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+```
+
+#### Option B: Qwen3-TTS Local (Recommended)
+See [Local Voice Server](#-local-voice-server-qwen3-tts) section below.
 
 ### 3. Configure Environment Variables
 
@@ -140,9 +188,18 @@ OPENROUTER_MODEL=google/gemini-flash-1.5-8b
 # Firebase Configuration
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 
-# ElevenLabs Voice (optional)
+# ===================
+# Voice Configuration (Choose One)
+# ===================
+
+# Option A: ElevenLabs API (cloud)
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ELEVENLABS_VOICE_ID=IKne3meq5aSn9XLyUdCD
+
+# Option B: Qwen3-TTS Local (enable local mode)
+IS_LOCAL=true
+LOCAL_TTS_URL=http://localhost:5001
+# VOICE_PROMPT=your_custom_voice_prompt (optional, default provided)
 
 # Database Path (local development)
 DB_PATH=./memory.db
@@ -155,6 +212,67 @@ npm run dev
 ```
 
 The bot will start in long-polling mode. Send `/start` to your bot!
+
+---
+
+## 🔊 Local Voice Server (Qwen3-TTS)
+
+**Requires:** GPU with 4GB+ VRAM (e.g., RTX 3060, RTX 4060, RTX 5060)
+
+### Quick Setup (One-time)
+
+```bash
+# Navigate to local folder
+cd local
+
+# Create virtual environment and install dependencies
+bash setup_tts.sh
+```
+
+### Running the Bot with Local Voice
+
+**Terminal 1 - Start Qwen3-TTS Server:**
+```bash
+cd OpenGRBC/local
+source venv_tts/bin/activate
+python qwen_tts_server.py
+```
+
+**Terminal 2 - Start the Bot:**
+```bash
+cd OpenGRBC
+IS_LOCAL=true npm run dev
+```
+
+### Custom Voice Prompt
+
+The default voice is configured with a professional male voice in Spanish. You can customize it by setting the `VOICE_PROMPT` environment variable:
+
+```env
+VOICE_PROMPT=gender: Feminino
+pitch: Voz aguda y juvenil
+age: twenties
+accent: Español latinoamericano (méxico)
+...
+```
+
+Or modify the default in `src/config.ts`.
+
+### Voice Prompt Example (Pre-configured)
+
+```env
+VOICE_PROMPT=gender: Masculino
+pitch: Voz profunda de barítono, resonante y con cuerpo
+speed: Ritmo controlado y calmado, hablando con pausas reflexivas
+volume: Moderado y firme
+age: Mediana edad (45-55 años)
+clarity: Altamente articulada y elocuente
+accent: Español (neutro corporativo o peninsular)
+texture: Cálida, firme y aterciopelada
+emotion: Serenidad, empatía y gran seguridad
+tone: Inspirador, profesional y directivo
+personality: Íntegro, líder corporativo, deceno y confiable
+```
 
 ---
 
@@ -189,6 +307,15 @@ The bot will start in long-polling mode. Send `/start` to your bot!
 ---
 
 ## ☁️ Deployment
+
+### ⚠️ Important: Voice in Production
+
+| Mode | Voice Support |
+|------|---------------|
+| **Render/Cloud** | ElevenLabs API (may be blocked) or Coqui API fallback |
+| **Local** | Qwen3-TTS with custom voice prompts |
+
+**Note:** Voice features work best in local mode. In production, the bot will work but may have voice limitations.
 
 ### Deploy to Render (Recommended)
 
@@ -258,11 +385,17 @@ OpenGRBC/
 │   │   ├── llm.ts      # LLM with triple fallback
 │   │   ├── loop.ts     # Main agent loop
 │   │   └── prompt.ts   # System prompt
+│   ├── bot/            # Telegram bot handlers
 │   ├── config.ts       # Configuration
 │   ├── memory/         # Firestore memory
+│   ├── tts/            # Voice synthesis (ElevenLabs/Coqui)
+│   ├── transcription/  # Voice transcription
 │   ├── tools/          # Tool registry
 │   ├── utils/          # Utilities
 │   └── index.ts        # Entry point
+├── local/
+│   ├── qwen_tts_server.py  # Qwen3-TTS local server
+│   └── setup_tts.sh        # Setup script
 ├── .env.example        # Environment template
 ├── package.json        # Dependencies
 └── tsconfig.json       # TypeScript config
@@ -295,6 +428,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - [Google Gemini](https://gemini.google.com/) - AI Models
 - [OpenRouter](https://openrouter.ai/) - Unified AI Access
 - [ElevenLabs](https://elevenlabs.io/) - Voice Synthesis
+- [Qwen](https://qwen.ai/) - Open Source TTS Models
+- [Coqui](https://coqui.ai/) - Open Source Speech AI
 - [Firebase](https://firebase.google.com/) - Backend Services
 
 ---
