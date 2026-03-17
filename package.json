@@ -1,0 +1,31 @@
+{
+  "name": "opengravity",
+  "version": "1.0.0",
+  "description": "Personal AI Telegram Agent on Firebase",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/index.local.ts",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "grammy": "^1.31.0",
+    "groq-sdk": "^0.8.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.17.0",
+    "firebase-tools": "^13.23.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
