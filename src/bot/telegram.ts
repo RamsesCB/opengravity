@@ -2,10 +2,27 @@ import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
-import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
+import { textToSpeech as elevenTTS, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
+import { textToSpeechGoogle, isGoogleTTSConfigured } from '../tts/google.js';
 import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
 import { tmpdir } from 'os';
 import { writeFile, unlink } from 'fs/promises';
+
+async function generateVoice(text: string): Promise<Buffer | null> {
+  // Try ElevenLabs first
+  if (isConfigured()) {
+    const audio = await elevenTTS(text);
+    if (audio) return audio;
+  }
+  
+  // Fallback to Google TTS
+  if (isGoogleTTSConfigured()) {
+    const audio = await textToSpeechGoogle(text);
+    if (audio) return audio;
+  }
+  
+  return null;
+}
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
@@ -117,7 +134,7 @@ bot.command('hablar', async (ctx) => {
   await ctx.reply('🎤 Generando audio...');
   
   try {
-    const audioBuffer = await textToSpeech(text);
+    const audioBuffer = await generateVoice(text);
     if (audioBuffer) {
       const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
       await writeFile(tempFile, audioBuffer);
@@ -134,7 +151,7 @@ bot.command('hablar', async (ctx) => {
 
 async function sendVoiceReply(ctx: any, text: string) {
   try {
-    const audioBuffer = await textToSpeech(text);
+    const audioBuffer = await generateVoice(text);
     if (audioBuffer) {
       const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
       await writeFile(tempFile, audioBuffer);

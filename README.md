@@ -1,12 +1,12 @@
 # OpenGravity
 
-AI Telegram Bot powered by Groq LLM with ElevenLabs voice.
+AI Telegram Bot powered by Groq LLM with voice synthesis.
 
 ## Features
 
 - 🤖 AI-powered Telegram bot using Groq's LLM
 - 🎤 **Voice Messages** - Send voice, get voice response
-- 🔊 **ElevenLabs** - Cloud transcription + TTS (same voice)
+- 🔊 **Dual TTS** - ElevenLabs (premium) + Google Cloud TTS (free)
 - 💾 Firebase Firestore for conversation memory
 - 🔒 User access control (whitelist)
 - 🖥️ Long polling (local) or Webhook (production)
