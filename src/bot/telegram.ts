@@ -2,8 +2,8 @@ import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
-import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured, transcribeAudio as elevenTranscribe } from '../tts/elevenlabs.js';
-import { isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
+import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
+import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
 import { tmpdir } from 'os';
 import { writeFile, unlink } from 'fs/promises';
 
@@ -47,8 +47,8 @@ bot.command('transcribe', async (ctx) => {
       return;
     }
     
-    const transcription = await elevenTranscribe(audioBuffer);
-    if (transcription) {
+    const transcription = await transcribeAudio(audioBuffer);
+    if (transcription && !transcription.includes('Error al transcribir')) {
       await ctx.reply(`📝 Transcripción:\n\n${transcription}`);
     } else {
       await ctx.reply('No pude transcribir el audio. Intenta de nuevo.');
@@ -168,9 +168,9 @@ bot.on('message:voice', async (ctx) => {
       return;
     }
     
-    const transcription = await elevenTranscribe(audioBuffer);
+    const transcription = await transcribeAudio(audioBuffer);
     
-    if (!transcription) {
+    if (!transcription || transcription.includes('Error al transcribir')) {
       await ctx.reply('No pude transcribir el audio. Intenta de nuevo.');
       return;
     }
