@@ -5,17 +5,32 @@ import { registry } from '../tools/registry.js';
 import { chatCompletion } from './llm.js';
 import { systemPrompt } from './prompt.js';
 
+const MAX_TOOL_CONTENT_LENGTH = 500;
+
+function truncateToolMessages(messages: any[]): any[] {
+  return messages.map(msg => {
+    if (msg.role === 'tool' && msg.content && msg.content.length > MAX_TOOL_CONTENT_LENGTH) {
+      return {
+        ...msg,
+        content: msg.content.substring(0, MAX_TOOL_CONTENT_LENGTH) + ' [Truncated]'
+      };
+    }
+    return msg;
+  });
+}
+
 export async function processUserMessage(userId: string, content: string): Promise<string> {
   // 1. Save user message to memory
   await memory.addMessage(userId, 'user', content);
 
   // 2. Fetch history
-  const history = await memory.getHistory(userId, 50); // Get last 50 messages
-  
   // 3. Build context
+  const history = await memory.getHistory(userId, 12);
+  const truncatedHistory = truncateToolMessages(history);
+  
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
-    ...history
+    ...truncatedHistory
   ];
 
   const tools = registry.getGroqToolDefinitions();
