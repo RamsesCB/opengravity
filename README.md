@@ -30,6 +30,39 @@ OpenGravity includes **free, offline audio transcription** using Whisper.cpp:
 - `/transcribe` - Transcribe a voice message
 - Send voice message directly for auto-transcription
 
+## Voice Output (TTS)
+
+OpenGravity supports **Text-to-Speech** using ElevenLabs for voice responses:
+
+- **Natural Voice** - Deep male voice (James)
+- **Multiple Languages** - ElevenLabs multilingual support
+- **Auto Mode** - Automatically respond with voice
+
+### Voice Commands
+
+- `/voice on` - Enable voice, use `/hablar` to get voice responses
+- `/voice auto` - Automatically respond with voice to all messages
+- `/voice off` - Disable voice
+- `/voice` - Show current status
+- `/hablar <text>` - Convert text to voice
+
+### Example
+
+```
+/voice on        # Enable voice
+/hablar Hola, como estas?  # Get voice response
+
+/voice auto     # Auto-voice mode
+(Any message will get voice response)
+```
+
+### Environment Variables
+
+```env
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+ELEVENLABS_VOICE_ID=jsCqWAovK14vIlaW1p  # Default: James (deep male voice)
+```
+
 ## Deployment
 
 ### Prerequisites
@@ -49,6 +82,8 @@ TELEGRAM_ALLOWED_USER_IDS=123456789,987654321
 GROQ_API_KEY=your_groq_api_key
 DB_PATH=./memory.db
 WHISPER_MODEL=base  # Optional: tiny, base (default: base)
+ELEVENLABS_API_KEY=your_elevenlabs_api_key  # Optional: for voice output
+ELEVENLABS_VOICE_ID=jsCqWAovK14vIlaW1p    # Optional: voice ID (default: James)
 ```
 
 ### Local Development
@@ -73,6 +108,7 @@ The first run will download the Whisper model (~140MB). Subsequent runs use cach
    - `GROQ_API_KEY`
    - `FIREBASE_SERVICE_ACCOUNT_JSON` (optional)
    - `WHISPER_MODEL` (optional, default: base)
+   - `ELEVENLABS_API_KEY` (optional, for voice output)
 
 5. Set webhook:
    ```
@@ -92,6 +128,7 @@ The first run will download the Whisper model (~140MB). Subsequent runs use cach
 - **LLM**: Groq SDK
 - **Storage**: Firebase Firestore
 - **Transcription**: Whisper.cpp (local)
+- **TTS**: ElevenLabs (voice output)
 - **Server**: Express.js (for webhook)
 
 ## License

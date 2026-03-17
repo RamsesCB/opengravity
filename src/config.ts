@@ -18,5 +18,7 @@ export const config = {
   OPENROUTER_MODEL: getEnv('OPENROUTER_MODEL', false, 'openrouter/free'),
   DB_PATH: getEnv('DB_PATH', false, './memory.db'),
   GOOGLE_APPLICATION_CREDENTIALS: getEnv('GOOGLE_APPLICATION_CREDENTIALS', false, './service-account.json'),
+  ELEVENLABS_API_KEY: getEnv('ELEVENLABS_API_KEY', false),
+  ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'jsCqWAovK14vIlaW1p'), // James - Deep, Raspy and Grim
   MAX_ITERATIONS: 10,
 };

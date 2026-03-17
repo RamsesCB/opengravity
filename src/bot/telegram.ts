@@ -1,8 +1,11 @@
-import { Bot } from 'grammy';
+import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
 import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
+import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
+import { tmpdir } from 'os';
+import { writeFile, unlink } from 'fs/promises';
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
@@ -52,6 +55,95 @@ bot.command('transcribe', async (ctx) => {
   }
 });
 
+bot.command('voice', async (ctx) => {
+  const userId = ctx.from?.id.toString() || '';
+  const message = ctx.message;
+  if (!message) return;
+  
+  const args = message.text.split(' ').slice(1);
+  const action = args[0]?.toLowerCase();
+  
+  if (!isConfigured()) {
+    await ctx.reply('⚠️ ElevenLabs no está configurado. Agrega ELEVENLABS_API_KEY en las variables de entorno.');
+    return;
+  }
+  
+  if (action === 'on' || action === 'auto') {
+    const autoRespond = action === 'auto';
+    setVoiceEnabled(userId, true, autoRespond);
+    await ctx.reply(autoRespond 
+      ? '🔊 Voz activada. Siempre te responderé por voz.'
+      : '🔊 Voz activada. Usa /hablar para que te responda por voz.');
+  } else if (action === 'off') {
+    setVoiceEnabled(userId, false);
+    await ctx.reply('🔇 Voz desactivada.');
+  } else {
+    const settings = getVoiceSettings(userId);
+    const status = settings.enabled 
+      ? (settings.autoRespond ? '🔊 Auto (siempre)' : '🔊 Activado')
+      : '🔇 Desactivado';
+    
+    await ctx.reply(`Estado de voz: ${status}\n\nUso: /voice on | auto | off\n- /voice on: Activa voz, usa /hablar\n- /voice auto: Siempre responde por voz\n- /voice off: Desactiva voz`);
+  }
+});
+
+bot.command('hablar', async (ctx) => {
+  const userId = ctx.from?.id.toString() || '';
+  const message = ctx.message;
+  if (!message) return;
+  
+  if (!isConfigured()) {
+    await ctx.reply('⚠️ ElevenLabs no está configurado.');
+    return;
+  }
+  
+  if (!isVoiceEnabled(userId)) {
+    await ctx.reply('🔇 Primero activa la voz con /voice on');
+    return;
+  }
+  
+  const args = ctx.message.text.split(' ').slice(1);
+  const text = args.join(' ');
+  
+  if (!text) {
+    await ctx.reply('Escribe el texto que quieres que diga. Ejemplo: /hablar Hola mundo');
+    return;
+  }
+  
+  await ctx.reply('🎤 Generando audio...');
+  
+  try {
+    const audioBuffer = await textToSpeech(text);
+    if (audioBuffer) {
+      const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
+      await writeFile(tempFile, audioBuffer);
+      await ctx.replyWithVoice(new InputFile(tempFile));
+      await unlink(tempFile).catch(() => {});
+    } else {
+      await ctx.reply('Error al generar el audio.');
+    }
+  } catch (error) {
+    logger.error('Error generating speech:', error);
+    await ctx.reply('Error al generar el audio.');
+  }
+});
+
+async function sendVoiceReply(ctx: any, text: string) {
+  try {
+    const audioBuffer = await textToSpeech(text);
+    if (audioBuffer) {
+      const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
+      await writeFile(tempFile, audioBuffer);
+      await ctx.replyWithVoice(new InputFile(tempFile));
+      await unlink(tempFile).catch(() => {});
+    } else {
+      await ctx.reply(text);
+    }
+  } catch {
+    await ctx.reply(text);
+  }
+}
+
 bot.on('message:voice', async (ctx) => {
   const userId = ctx.from.id.toString();
   const voice = ctx.message.voice;
@@ -84,8 +176,11 @@ bot.on('message:voice', async (ctx) => {
 
 // Ignore other commands manually for now or pass them to the LLM
 bot.on('message:text', async (ctx) => {
-  const userId = ctx.from.id.toString();
-  const text = ctx.message.text;
+  const userId = ctx.from?.id.toString() || '';
+  const message = ctx.message;
+  if (!message) return;
+  
+  const text = message.text;
 
   logger.info(`Received message from ${userId}: ${text}`);
 
@@ -95,7 +190,11 @@ bot.on('message:text', async (ctx) => {
   try {
     const reply = await processUserMessage(userId, text);
     if (reply) {
-      await ctx.reply(reply);
+      if (isAutoRespondEnabled(userId) && isVoiceEnabled(userId)) {
+        await sendVoiceReply(ctx, reply);
+      } else {
+        await ctx.reply(reply);
+      }
     }
   } catch (error) {
     logger.error('Error handling message:', error);
