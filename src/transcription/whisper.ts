@@ -1,43 +1,44 @@
-import Whisper from '@lumen-labs-dev/whisper-node';
+import Groq from 'groq-sdk';
 import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
-import { readFile, unlink } from 'fs/promises';
+import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { writeFile } from 'fs/promises';
+import fs from 'fs';
 
-let whisper: Whisper | null = null;
+const groq = new Groq({
+    apiKey: config.GROQ_API_KEY,
+});
 
-const WHISPER_MODEL = process.env.WHISPER_MODEL || 'base';
 const MAX_AUDIO_SIZE_MB = 20;
 
-async function getWhisper(): Promise<Whisper> {
-    if (!whisper) {
-        logger.info(`Loading Whisper model: ${WHISPER_MODEL}`);
-        whisper = new Whisper({
-            model: WHISPER_MODEL,
-        });
-        await whisper.load();
-        logger.info('Whisper model loaded successfully');
-    }
-    return whisper;
-}
-
+/**
+ * Transcribes audio using Groq Whisper API. 
+ * This is MUCH faster and uses 0 RAM compared to local whisper.
+ */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
     try {
-        const tempFile = join(tmpdir(), `audio_${Date.now()}.wav`);
+        logger.info('Starting transcription via Groq API...');
         
+        // Save buffer to temporary file because Groq SDK needs a file stream
+        const tempFile = join(tmpdir(), `audio_${Date.now()}.ogg`);
         await writeFile(tempFile, audioBuffer);
         
-        const w = await getWhisper();
-        const result = await w.transcribe(tempFile);
+        const transcription = await groq.audio.transcriptions.create({
+            file: fs.createReadStream(tempFile),
+            model: 'whisper-large-v3',
+            response_format: 'json',
+            language: 'es', // Assume Spanish by default
+        });
         
+        // Clean up
         await unlink(tempFile).catch(() => {});
         
-        return result.text || 'No se pudo transcribir el audio';
+        return transcription.text || 'No se pudo transcribir el audio';
     } catch (error) {
-        logger.error('Error transcribing audio:', error);
-        throw error;
+        logger.error('Error transcribing audio via Groq:', error);
+        return 'Error al transcribir el audio con la API de Groq.';
     }
 }
 
@@ -51,9 +52,5 @@ export function formatAudioSize(sizeBytes: number): string {
     return `${sizeMB.toFixed(2)} MB`;
 }
 
-export async function unloadWhisper(): Promise<void> {
-    if (whisper) {
-        whisper = null;
-        logger.info('Whisper model unloaded');
-    }
-}
+// Dummy for backward compatibility
+export async function unloadWhisper(): Promise<void> {}
