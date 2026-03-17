@@ -1,5 +1,4 @@
-import { onRequest, Request } from "firebase-functions/v2/https";
-import { Response } from "express";
+import { onRequest } from "firebase-functions/v2/https";
 import { webhookCallback } from "grammy";
 import { bot } from "./bot/telegram.js";
 import { logger } from "./utils/logger.js";
@@ -10,7 +9,7 @@ export const opengravity = onRequest({
     maxInstances: 5,            // Prevent large bills
     timeoutSeconds: 120,        // Allow LLM some time
     region: 'us-central1'
-}, async (req: Request, res: Response) => {
+}, async (req, res) => {
     logger.info("Received Webhook Request.");
     
     // grammy webhook handler for express-like environments
