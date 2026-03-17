@@ -3,6 +3,7 @@ import { logger } from '../utils/logger.js';
 
 const ELEVENLABS_API_KEY = config.ELEVENLABS_API_KEY;
 const VOICE_ID = config.ELEVENLABS_VOICE_ID;
+const OPENAI_API_KEY = config.OPENAI_API_KEY;
 
 interface UserVoiceSettings {
   enabled: boolean;
@@ -30,6 +31,14 @@ export function getVoiceSettings(userId: string): UserVoiceSettings {
 }
 
 export async function textToSpeech(text: string): Promise<Buffer | null> {
+  const audioBuffer = await elevenLabsTTS(text);
+  if (audioBuffer) return audioBuffer;
+
+  logger.warn('Falling back to OpenAI TTS');
+  return openaiTTS(text);
+}
+
+async function elevenLabsTTS(text: string): Promise<Buffer | null> {
   if (!ELEVENLABS_API_KEY) {
     logger.warn('ElevenLabs API key not configured');
     return null;
@@ -67,7 +76,44 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (error) {
-    logger.error('Error generating speech:', error);
+    logger.error('Error generating speech with ElevenLabs:', error);
+    return null;
+  }
+}
+
+async function openaiTTS(text: string): Promise<Buffer | null> {
+  if (!OPENAI_API_KEY) {
+    logger.warn('OpenAI API key not configured, TTS unavailable');
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      'https://api.openai.com/v1/audio/speech',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: 'alloy',
+          input: text,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error(`OpenAI TTS error: ${response.status} - ${error}`);
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    logger.error('Error generating speech with OpenAI:', error);
     return null;
   }
 }
