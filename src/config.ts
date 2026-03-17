@@ -23,5 +23,17 @@ export const config = {
   ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'IKne3meq5aSn9XLyUdCD'),
   IS_LOCAL: getEnv('IS_LOCAL', false, 'false').toLowerCase() === 'true',
   LOCAL_TTS_URL: getEnv('LOCAL_TTS_URL', false, 'http://localhost:5001'),
+  VOICE_PROMPT: getEnv('VOICE_PROMPT', false, `gender: Masculino
+pitch: Voz profunda de barítono, resonante y con cuerpo
+speed: Ritmo controlado y calmado, hablando con pausas reflexivas
+volume: Moderado y firme, proyectando autoridad natural sin necesidad de gritar
+age: Mediana edad (45-55 años)
+clarity: Altamente articulada y elocuente, con una dicción impecable
+fluency: Flujo suave y seguro, propio de un líder experimentado
+accent: Acento en español (neutro corporativo o peninsular)
+texture: Cálida, firme y aterciopelada, que inspira confianza inmediata
+emotion: Serenidad, empatía y gran seguridad en sí mismo
+tone: Inspirador, profesional y directivo, pero accesible y de buen corazón
+personality: Íntegro, líder corporativo, decente y sumo confiable`),
   MAX_ITERATIONS: 10,
 };
