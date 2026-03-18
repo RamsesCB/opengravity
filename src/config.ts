@@ -32,7 +32,7 @@ export const config = {
   TELEGRAM_ALLOWED_USER_IDS: getEnv('TELEGRAM_ALLOWED_USER_IDS').split(',').map(id => id.trim()).filter(Boolean),
   GROQ_API_KEY: getEnv('GROQ_API_KEY'),
   OPENROUTER_API_KEY: getEnv('OPENROUTER_API_KEY', false),
-  OPENROUTER_MODEL: getEnv('OPENROUTER_MODEL', false, 'google/gemini-flash-1.5-8b'),
+  OPENROUTER_MODEL: getEnv('OPENROUTER_MODEL', false, 'meta-llama/llama-3.1-8b-instruct'),
   GEMINI_API_KEY: getEnv('GEMINI_API_KEY', false),
   DB_PATH: getEnv('DB_PATH', false, './memory.db'),
   GOOGLE_APPLICATION_CREDENTIALS: getEnv('GOOGLE_APPLICATION_CREDENTIALS', false, './service-account.json'),
