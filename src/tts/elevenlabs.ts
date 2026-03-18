@@ -1,16 +1,11 @@
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { spawn } from 'child_process';
+import text2wav from 'text2wav';
 
-const ELEVENLABS_API_KEY = config.ELEVENLABS_API_KEY;
-const VOICE_ID = config.ELEVENLABS_VOICE_ID;
 const IS_LOCAL = config.IS_LOCAL;
 const LOCAL_TTS_URL = config.LOCAL_TTS_URL;
 const VOICE_PROMPT = config.VOICE_PROMPT;
-const ESPEAK_ENABLED = config.ESPEAK_ENABLED;
-const ESPEAK_NG_COMMAND = config.ESPEAK_NG_COMMAND;
-const ESPEAK_NG_VOICE = config.ESPEAK_NG_VOICE;
-const ESPEAK_NG_SPEED = config.ESPEAK_NG_SPEED;
+const TTS_TIMEOUT = config.TTS_TIMEOUT;
 
 interface UserVoiceSettings {
   enabled: boolean;
@@ -42,10 +37,10 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
     logger.warn('Local TTS failed, no fallback available in local mode');
     return null;
   } else {
-    const audio = await elevenLabsTTS(text);
+    const audio = await text2wavTTS(text);
     if (audio) return audio;
-    logger.warn('ElevenLabs failed, falling back to eSpeak NG');
-    return espeakTTS(text);
+    logger.warn('Production TTS failed');
+    return null;
   }
 }
 
@@ -70,72 +65,30 @@ async function localTTS(text: string): Promise<Buffer | null> {
   }
 }
 
-async function elevenLabsTTS(text: string): Promise<Buffer | null> {
-  if (!ELEVENLABS_API_KEY) return null;
-
+async function text2wavTTS(text: string): Promise<Buffer | null> {
   try {
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
-      {
-        method: 'POST',
-        headers: { 'Accept': 'audio/mpeg', 'Content-Type': 'application/json', 'xi-api-key': ELEVENLABS_API_KEY },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.5, use_speaker_boost: true }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      logger.error(`ElevenLabs API error: ${response.status} - ${await response.text()}`);
-      return null;
+    logger.info('Generating speech with text2wav...');
+    
+    const audioBuffer = await Promise.race([
+      text2wav(text, { voice: 'es', speed: 175 }),
+      new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('TTS timeout')), TTS_TIMEOUT)
+      )
+    ]) as Uint8Array;
+    
+    if (audioBuffer && audioBuffer.length > 0) {
+      logger.info(`Generated audio: ${audioBuffer.length} bytes`);
+      return Buffer.from(audioBuffer);
     }
-
-    return Buffer.from(await response.arrayBuffer());
+    
+    logger.error('text2wav returned empty audio');
+    return null;
   } catch (error) {
-    logger.error('Error generating speech with ElevenLabs:', error);
+    logger.error('Error generating speech with text2wav:', error);
     return null;
   }
 }
 
-async function espeakTTS(text: string): Promise<Buffer | null> {
-  if (!ESPEAK_ENABLED) return null;
-
-  return new Promise((resolve) => {
-    const args = ['-v', ESPEAK_NG_VOICE, '-s', String(ESPEAK_NG_SPEED), '--stdout', text];
-    const process = spawn(ESPEAK_NG_COMMAND, args);
-    const stdoutChunks: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
-
-    process.stdout.on('data', (chunk) => stdoutChunks.push(Buffer.from(chunk)));
-    process.stderr.on('data', (chunk) => stderrChunks.push(Buffer.from(chunk)));
-
-    process.on('error', (error) => {
-      logger.error('Error starting eSpeak NG:', error);
-      resolve(null);
-    });
-
-    process.on('close', (code) => {
-      if (code !== 0) {
-        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
-        logger.error(`eSpeak NG exited with code ${code}${stderr ? `: ${stderr}` : ''}`);
-        resolve(null);
-        return;
-      }
-
-      const audio = Buffer.concat(stdoutChunks);
-      if (!audio.length) {
-        logger.error('eSpeak NG produced empty audio output');
-        resolve(null);
-        return;
-      }
-
-      resolve(audio);
-    });
-  });
-}
-
 export function isConfigured(): boolean {
-  return IS_LOCAL || !!ELEVENLABS_API_KEY || (!IS_LOCAL && ESPEAK_ENABLED);
+  return IS_LOCAL || true;
 }

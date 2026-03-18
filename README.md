@@ -114,7 +114,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 
 OpenGRBC supports **two voice (TTS) modes**:
 
-### Option A: Local Voice (Qwen3-TTS)
+### Option A: Local Voice (Qwen3-TTS) - Recommended
 
 | Pros | Cons |
 |------|------|
@@ -123,17 +123,18 @@ OpenGRBC supports **two voice (TTS) modes**:
 | ✅ No cloud dependency | ❌ Only works when running locally |
 | ✅ No account/API needed | |
 
-### Option B: Production Voice Fallback (eSpeak NG)
+### Option B: Production Voice (text2wav)
 
 | Pros | Cons |
 |------|------|
-| ✅ Gratis y simple | ❌ Voz robótica |
-| ✅ Sin APIs externas | ❌ Menor calidad natural |
-| ✅ Útil cuando ElevenLabs falla | ❌ Requiere `espeak-ng` instalado en servidor |
+| ✅ 100% npm package (no binaries) | ❌ Voz robótica |
+| ✅ Works on any Node.js server | ❌ Menor calidad natural |
+| ✅ No API keys needed | |
+| ✅ No IP blocking issues | |
 
 **Behavior:**
-- **Modo local (`IS_LOCAL=true`)**: usa Qwen3-TTS.
-- **Modo producción (`IS_LOCAL=false`)**: usa ElevenLabs si está configurado; si falla, hace fallback a eSpeak NG.
+- **Local mode (`IS_LOCAL=true`)**: Qwen3-TTS (GPU, custom voice)
+- **Production mode (`IS_LOCAL=false`)**: text2wav (npm package)
 
 ---
 
@@ -154,14 +155,11 @@ npm install
 
 ### 3. Choose Your Voice Mode
 
-#### Option A: Qwen3-TTS Local (Recommended)
+#### Option A: Qwen3-TTS Local (Recommended for best voice quality)
 See [Local Voice Server](#-local-voice-server-qwen3-tts) section below.
 
-#### Option B: Production fallback (eSpeak NG + optional ElevenLabs)
-Add to your `.env` if you want ElevenLabs as primary in production:
-```env
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
-```
+#### Option B: Production (text2wav - no config needed)
+The production voice is automatically enabled. No additional configuration required!
 
 ### 3. Configure Environment Variables
 
@@ -196,23 +194,16 @@ OPENROUTER_MODEL=google/gemini-flash-1.5-8b
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 
 # ===================
-# Voice Configuration (Choose One)
+# Voice Configuration
 # ===================
 
-# Option A: ElevenLabs API (cloud)
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
-ELEVENLABS_VOICE_ID=IKne3meq5aSn9XLyUdCD
-
-# Option B: Qwen3-TTS Local (enable local mode)
-IS_LOCAL=true
+# Local Mode (Qwen3-TTS) - Enable when running locally with GPU
+IS_LOCAL=false
 LOCAL_TTS_URL=http://localhost:5001
-# VOICE_PROMPT=your_custom_voice_prompt (optional, default provided)
+# VOICE_PROMPT=your_custom_voice_prompt (optional)
 
-# Production fallback voice (eSpeak NG)
-ESPEAK_ENABLED=true
-ESPEAK_NG_COMMAND=espeak-ng
-ESPEAK_NG_VOICE=es-la
-ESPEAK_NG_SPEED=155
+# Production voice (text2wav) - No config needed, works automatically
+# TTS_TIMEOUT=10000 (optional, in milliseconds)
 
 # Database Path (local development)
 DB_PATH=./memory.db
@@ -325,17 +316,17 @@ personality: Íntegro, líder corporativo, deceno y confiable
 
 | Mode | Voice Support |
 |------|---------------|
-| **Render/Cloud** | ElevenLabs (optional) + eSpeak NG fallback |
+| **Render/Cloud** | text2wav (npm package - works automatically) |
 | **Local** | Qwen3-TTS with custom voice prompts |
 
-**Note:** In production install `espeak-ng` in the host OS (example Ubuntu/Debian: `sudo apt-get install -y espeak-ng`).
+**Note:** No additional installation required! text2wav is a pure npm package.
 
 ### ✅ Definitive Plan (March 2026)
 
 | Mode | Voice | Transcription |
 |------|-------|---------------|
 | **Local** | Qwen3-TTS (custom voice) | Groq Whisper |
-| **Production** | eSpeak NG fallback (optional ElevenLabs primary) | Groq Whisper |
+| **Production** | text2wav (npm) | Groq Whisper |
 
 Whisper limit reference (free tier): **20 RPM** on `whisper-large-v3`, equivalent to ~**8 hours/day** of audio.
 
