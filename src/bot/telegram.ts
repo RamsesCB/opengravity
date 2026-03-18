@@ -7,6 +7,40 @@ import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcrip
 import { tmpdir } from 'os';
 import { writeFile, unlink } from 'fs/promises';
 
+function detectAudioExtension(audioBuffer: Buffer): 'mp3' | 'wav' | 'ogg' {
+  if (audioBuffer.length >= 4) {
+    const header = audioBuffer.subarray(0, 4).toString('ascii');
+    if (header === 'RIFF') return 'wav';
+    if (header === 'OggS') return 'ogg';
+  }
+
+  if (audioBuffer.length >= 3 && audioBuffer.subarray(0, 3).toString('ascii') === 'ID3') {
+    return 'mp3';
+  }
+
+  if (audioBuffer.length >= 2 && audioBuffer[0] === 0xff && (audioBuffer[1] & 0xe0) === 0xe0) {
+    return 'mp3';
+  }
+
+  return 'mp3';
+}
+
+async function sendTtsAudio(ctx: any, audioBuffer: Buffer): Promise<void> {
+  const ext = detectAudioExtension(audioBuffer);
+  const tempFile = `${tmpdir()}/voice_${Date.now()}.${ext}`;
+
+  await writeFile(tempFile, audioBuffer);
+
+  try {
+    await ctx.replyWithVoice(new InputFile(tempFile));
+  } catch (voiceError) {
+    logger.warn('replyWithVoice failed, trying replyWithAudio', voiceError);
+    await ctx.replyWithAudio(new InputFile(tempFile));
+  } finally {
+    await unlink(tempFile).catch(() => {});
+  }
+}
+
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
 // Auth middleware
@@ -68,7 +102,7 @@ bot.command('voice', async (ctx) => {
   const action = args[0]?.toLowerCase();
   
   if (!isConfigured()) {
-    await ctx.reply('⚠️ ElevenLabs no está configurado. Agrega ELEVENLABS_API_KEY en las variables de entorno.');
+    await ctx.reply('⚠️ TTS no está configurado. Usa IS_LOCAL=true para Qwen3-TTS o configura ElevenLabs/eSpeak NG en producción.');
     return;
   }
   
@@ -97,7 +131,7 @@ bot.command('hablar', async (ctx) => {
   if (!message) return;
   
   if (!isConfigured()) {
-    await ctx.reply('⚠️ ElevenLabs no está configurado.');
+    await ctx.reply('⚠️ TTS no está configurado.');
     return;
   }
   
@@ -119,10 +153,7 @@ bot.command('hablar', async (ctx) => {
   try {
     const audioBuffer = await textToSpeech(text);
     if (audioBuffer) {
-      const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
-      await writeFile(tempFile, audioBuffer);
-      await ctx.replyWithVoice(new InputFile(tempFile));
-      await unlink(tempFile).catch(() => {});
+      await sendTtsAudio(ctx, audioBuffer);
     } else {
       await ctx.reply('Error al generar el audio.');
     }
@@ -136,10 +167,7 @@ async function sendVoiceReply(ctx: any, text: string) {
   try {
     const audioBuffer = await textToSpeech(text);
     if (audioBuffer) {
-      const tempFile = `${tmpdir()}/voice_${Date.now()}.mp3`;
-      await writeFile(tempFile, audioBuffer);
-      await ctx.replyWithVoice(new InputFile(tempFile));
-      await unlink(tempFile).catch(() => {});
+      await sendTtsAudio(ctx, audioBuffer);
     } else {
       await ctx.reply(text);
     }

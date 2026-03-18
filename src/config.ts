@@ -37,5 +37,9 @@ export const config = {
   IS_LOCAL: getEnv('IS_LOCAL', false, 'false').toLowerCase() === 'true',
   LOCAL_TTS_URL: getEnv('LOCAL_TTS_URL', false, 'http://localhost:5001'),
   VOICE_PROMPT: getEnv('VOICE_PROMPT', false, DEFAULT_VOICE_PROMPT),
+  ESPEAK_ENABLED: getEnv('ESPEAK_ENABLED', false, 'true').toLowerCase() === 'true',
+  ESPEAK_NG_COMMAND: getEnv('ESPEAK_NG_COMMAND', false, 'espeak-ng'),
+  ESPEAK_NG_VOICE: getEnv('ESPEAK_NG_VOICE', false, 'es-la'),
+  ESPEAK_NG_SPEED: Number.parseInt(getEnv('ESPEAK_NG_SPEED', false, '155'), 10) || 155,
   MAX_ITERATIONS: 10,
 };

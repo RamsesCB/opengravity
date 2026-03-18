@@ -107,19 +107,9 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 
 ## 🎤 Voice Configuration
 
-OpenGRBC supports **two voice (TTS) options**:
+OpenGRBC supports **two voice (TTS) modes**:
 
-### Option A: ElevenLabs API (Cloud)
-
-| Pros | Cons |
-|------|------|
-| ✅ Easy setup | ❌ Can be blocked on cloud platforms (Render) |
-| ✅ No local setup | ❌ Limited free tier |
-| ✅ High quality | ❌ Requires API key |
-
-**Warning:** ElevenLabs may block accounts when deployed to cloud platforms like Render due to datacenter IP detection. If this happens, use **Option B**.
-
-### Option B: Qwen3-TTS Local (Recommended)
+### Option A: Local Voice (Qwen3-TTS)
 
 | Pros | Cons |
 |------|------|
@@ -127,6 +117,18 @@ OpenGRBC supports **two voice (TTS) options**:
 | ✅ Custom voice with prompts | ❌ Local setup required |
 | ✅ No cloud dependency | ❌ Only works when running locally |
 | ✅ No account/API needed | |
+
+### Option B: Production Voice Fallback (eSpeak NG)
+
+| Pros | Cons |
+|------|------|
+| ✅ Gratis y simple | ❌ Voz robótica |
+| ✅ Sin APIs externas | ❌ Menor calidad natural |
+| ✅ Útil cuando ElevenLabs falla | ❌ Requiere `espeak-ng` instalado en servidor |
+
+**Behavior:**
+- **Modo local (`IS_LOCAL=true`)**: usa Qwen3-TTS.
+- **Modo producción (`IS_LOCAL=false`)**: usa ElevenLabs si está configurado; si falla, hace fallback a eSpeak NG.
 
 ---
 
@@ -147,14 +149,14 @@ npm install
 
 ### 3. Choose Your Voice Mode
 
-#### Option A: ElevenLabs (Cloud)
-Add to your `.env`:
+#### Option A: Qwen3-TTS Local (Recommended)
+See [Local Voice Server](#-local-voice-server-qwen3-tts) section below.
+
+#### Option B: Production fallback (eSpeak NG + optional ElevenLabs)
+Add to your `.env` if you want ElevenLabs as primary in production:
 ```env
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ```
-
-#### Option B: Qwen3-TTS Local (Recommended)
-See [Local Voice Server](#-local-voice-server-qwen3-tts) section below.
 
 ### 3. Configure Environment Variables
 
@@ -200,6 +202,12 @@ ELEVENLABS_VOICE_ID=IKne3meq5aSn9XLyUdCD
 IS_LOCAL=true
 LOCAL_TTS_URL=http://localhost:5001
 # VOICE_PROMPT=your_custom_voice_prompt (optional, default provided)
+
+# Production fallback voice (eSpeak NG)
+ESPEAK_ENABLED=true
+ESPEAK_NG_COMMAND=espeak-ng
+ESPEAK_NG_VOICE=es-la
+ESPEAK_NG_SPEED=155
 
 # Database Path (local development)
 DB_PATH=./memory.db
@@ -312,10 +320,19 @@ personality: Íntegro, líder corporativo, deceno y confiable
 
 | Mode | Voice Support |
 |------|---------------|
-| **Render/Cloud** | ElevenLabs API (may be blocked) or Coqui API fallback |
+| **Render/Cloud** | ElevenLabs (optional) + eSpeak NG fallback |
 | **Local** | Qwen3-TTS with custom voice prompts |
 
-**Note:** Voice features work best in local mode. In production, the bot will work but may have voice limitations.
+**Note:** In production install `espeak-ng` in the host OS (example Ubuntu/Debian: `sudo apt-get install -y espeak-ng`).
+
+### ✅ Definitive Plan (March 2026)
+
+| Mode | Voice | Transcription |
+|------|-------|---------------|
+| **Local** | Qwen3-TTS (custom voice) | Groq Whisper |
+| **Production** | eSpeak NG fallback (optional ElevenLabs primary) | Groq Whisper |
+
+Whisper limit reference (free tier): **20 RPM** on `whisper-large-v3`, equivalent to ~**8 hours/day** of audio.
 
 ### Deploy to Render (Recommended)
 
@@ -388,7 +405,7 @@ OpenGRBC/
 │   ├── bot/            # Telegram bot handlers
 │   ├── config.ts       # Configuration
 │   ├── memory/         # Firestore memory
-│   ├── tts/            # Voice synthesis (ElevenLabs/Coqui)
+│   ├── tts/            # Voice synthesis (Qwen local, ElevenLabs, eSpeak fallback)
 │   ├── transcription/  # Voice transcription
 │   ├── tools/          # Tool registry
 │   ├── utils/          # Utilities
@@ -429,7 +446,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - [OpenRouter](https://openrouter.ai/) - Unified AI Access
 - [ElevenLabs](https://elevenlabs.io/) - Voice Synthesis
 - [Qwen](https://qwen.ai/) - Open Source TTS Models
-- [Coqui](https://coqui.ai/) - Open Source Speech AI
+- [eSpeak NG](https://github.com/espeak-ng/espeak-ng) - Lightweight offline TTS fallback
 - [Firebase](https://firebase.google.com/) - Backend Services
 
 ---

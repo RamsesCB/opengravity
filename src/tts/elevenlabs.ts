@@ -1,11 +1,16 @@
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { spawn } from 'child_process';
 
 const ELEVENLABS_API_KEY = config.ELEVENLABS_API_KEY;
 const VOICE_ID = config.ELEVENLABS_VOICE_ID;
 const IS_LOCAL = config.IS_LOCAL;
 const LOCAL_TTS_URL = config.LOCAL_TTS_URL;
 const VOICE_PROMPT = config.VOICE_PROMPT;
+const ESPEAK_ENABLED = config.ESPEAK_ENABLED;
+const ESPEAK_NG_COMMAND = config.ESPEAK_NG_COMMAND;
+const ESPEAK_NG_VOICE = config.ESPEAK_NG_VOICE;
+const ESPEAK_NG_SPEED = config.ESPEAK_NG_SPEED;
 
 interface UserVoiceSettings {
   enabled: boolean;
@@ -34,13 +39,14 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
   if (IS_LOCAL) {
     const audio = await localTTS(text);
     if (audio) return audio;
-    logger.warn('Local TTS failed, falling back to Coqui API');
+    logger.warn('Local TTS failed, no fallback available in local mode');
+    return null;
   } else {
     const audio = await elevenLabsTTS(text);
     if (audio) return audio;
-    logger.warn('ElevenLabs failed, falling back to Coqui API');
+    logger.warn('ElevenLabs failed, falling back to eSpeak NG');
+    return espeakTTS(text);
   }
-  return coquiTTS(text);
 }
 
 async function localTTS(text: string): Promise<Buffer | null> {
@@ -93,28 +99,45 @@ async function elevenLabsTTS(text: string): Promise<Buffer | null> {
   }
 }
 
-async function coquiTTS(text: string): Promise<Buffer | null> {
-  try {
-    const response = await fetch('https://api.coqui.ai/v2/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model_id: 'coqui/xtts', text, language: 'es' })
+async function espeakTTS(text: string): Promise<Buffer | null> {
+  if (!ESPEAK_ENABLED) return null;
+
+  return new Promise((resolve) => {
+    const args = ['-v', ESPEAK_NG_VOICE, '-s', String(ESPEAK_NG_SPEED), '--stdout', text];
+    const process = spawn(ESPEAK_NG_COMMAND, args);
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+
+    process.stdout.on('data', (chunk) => stdoutChunks.push(Buffer.from(chunk)));
+    process.stderr.on('data', (chunk) => stderrChunks.push(Buffer.from(chunk)));
+
+    process.on('error', (error) => {
+      logger.error('Error starting eSpeak NG:', error);
+      resolve(null);
     });
 
-    if (!response.ok) {
-      logger.error(`Coqui TTS error: ${response.status} - ${await response.text()}`);
-      return null;
-    }
+    process.on('close', (code) => {
+      if (code !== 0) {
+        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+        logger.error(`eSpeak NG exited with code ${code}${stderr ? `: ${stderr}` : ''}`);
+        resolve(null);
+        return;
+      }
 
-    return Buffer.from(await response.text(), 'base64');
-  } catch (error) {
-    logger.error('Error generating speech with Coqui:', error);
-    return null;
-  }
+      const audio = Buffer.concat(stdoutChunks);
+      if (!audio.length) {
+        logger.error('eSpeak NG produced empty audio output');
+        resolve(null);
+        return;
+      }
+
+      resolve(audio);
+    });
+  });
 }
 
 export function isConfigured(): boolean {
-  return !!ELEVENLABS_API_KEY || IS_LOCAL;
+  return IS_LOCAL || !!ELEVENLABS_API_KEY || (!IS_LOCAL && ESPEAK_ENABLED);
 }
 
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
