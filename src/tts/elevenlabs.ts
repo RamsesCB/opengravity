@@ -139,30 +139,3 @@ async function espeakTTS(text: string): Promise<Buffer | null> {
 export function isConfigured(): boolean {
   return IS_LOCAL || !!ELEVENLABS_API_KEY || (!IS_LOCAL && ESPEAK_ENABLED);
 }
-
-export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
-  if (!ELEVENLABS_API_KEY) return null;
-
-  try {
-    const blob = new Blob([new Uint8Array(audioBuffer)], { type: 'audio/ogg' });
-    const formData = new FormData();
-    formData.append('file', blob, 'audio.ogg');
-    formData.append('model_id', 'scribe_multilingual');
-
-    const response = await fetch('https://api.elevenlabs.io/v1/transcription', {
-      method: 'POST',
-      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
-      body: formData
-    });
-
-    if (!response.ok) {
-      logger.error(`ElevenLabs transcription error: ${response.status} - ${await response.text()}`);
-      return null;
-    }
-
-    return (await response.json()).text || null;
-  } catch (error) {
-    logger.error('Error transcribing audio with ElevenLabs:', error);
-    return null;
-  }
-}
