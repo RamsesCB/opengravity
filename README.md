@@ -34,7 +34,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 |---------|-------------|
 | 🤖 **Triple LLM Fallback** | Groq → Gemini Flash → OpenRouter automatic failover |
 | 🎤 **Voice Messages** | Send voice, receive voice responses |
-| 🔊 **TTS Options** | ElevenLabs API or Qwen3-TTS (local, free, custom voice) |
+| 🔊 **TTS Options** | Local: Qwen3-TTS (GPU) \| Production: eSpeak NG (lightweight) |
 | 💾 **Persistent Memory** | Firebase Firestore stores conversation history |
 | 🔒 **Access Control** | Whitelist-only user access |
 | 📝 **Tool Calling** | Execute functions and tools via AI |
@@ -74,11 +74,16 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 │   │                    Voice Layer                            │  │
 │   ├──────────────────────────────────────────────────────────┤  │
 │   │  ┌─────────────────┐    ┌─────────────────────────────┐  │  │
-│   │  │  ElevenLabs    │    │   Qwen3-TTS (Local)         │  │  │
-│   │  │     API        │    │   - Voice Design (free)     │  │  │
+│   │  │  ElevenLabs    │    │   Qwen3-TTS (Local)        │  │  │
+│   │  │     API        │    │   - Voice Design (GPU)      │  │  │
 │   │  │  (cloud)       │    │   - Custom prompts         │  │  │
 │   │  └────────┬────────┘    └──────────────┬──────────────┘  │  │
 │   │           │                              │                  │  │
+│   │  ┌────────┴────────┐                   │                  │  │
+│   │  │  eSpeak NG     │◄──────────────────┘                  │  │
+│   │  │  (production)  │   (lightweight fallback)             │  │
+│   │  └─────────────────┘                                       │  │
+│   │           │                                               │  │
 │   │           └──────────────┬──────────────┘                  │  │
 │   │                          ▼                                 │  │
 │   │              ┌─────────────────────┐                      │  │
