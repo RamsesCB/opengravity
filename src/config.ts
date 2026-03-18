@@ -10,18 +10,22 @@ function getEnv(key: string, required = true, defaultValue = ''): string {
   return value || defaultValue;
 }
 
+function getEnvNumber(key: string, defaultValue: number): number {
+  const value = process.env[key];
+  return value ? parseInt(value, 10) : defaultValue;
+}
+
 const DEFAULT_VOICE_PROMPT = `gender: Masculino
 pitch: Voz profunda de barítono, resonante y con cuerpo
 speed: Ritmo controlado y calmado, hablando con pausas reflexivas
-volume: Moderado y firme, proyectando autoridad natural sin necesidad de gritar
+volume: Moderado y firme
 age: Mediana edad (45-55 años)
-clarity: Altamente articulada y elocuente, con una dicción impecable
-fluency: Flujo suave y seguro, propio de un líder experimentado
-accent: Acento en español (neutro corporativo o peninsular)
-texture: Cálida, firme y aterciopelada, que inspira confianza inmediata
-emotion: Serenidad, empatía y gran seguridad en sí mismo
-tone: Inspirador, profesional y directivo, pero accesible y de buen corazón
-personality: Íntegro, líder corporativo, decente y sumo confiable`;
+clarity: Altamente articulada y elocuente
+accent: Español (neutro corporativo o peninsular)
+texture: Cálida, firme y aterciopelada
+emotion: Serenidad, empatía y gran seguridad
+tone: Inspirador, profesional y directivo
+personality: Íntegro, líder corporativo, confiable`;
 
 export const config = {
   TELEGRAM_BOT_TOKEN: getEnv('TELEGRAM_BOT_TOKEN'),
@@ -32,14 +36,12 @@ export const config = {
   GEMINI_API_KEY: getEnv('GEMINI_API_KEY', false),
   DB_PATH: getEnv('DB_PATH', false, './memory.db'),
   GOOGLE_APPLICATION_CREDENTIALS: getEnv('GOOGLE_APPLICATION_CREDENTIALS', false, './service-account.json'),
-  ELEVENLABS_API_KEY: getEnv('ELEVENLABS_API_KEY', false),
-  ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'IKne3meq5aSn9XLyUdCD'),
+  
+  // Voice Configuration
   IS_LOCAL: getEnv('IS_LOCAL', false, 'false').toLowerCase() === 'true',
   LOCAL_TTS_URL: getEnv('LOCAL_TTS_URL', false, 'http://localhost:5001'),
   VOICE_PROMPT: getEnv('VOICE_PROMPT', false, DEFAULT_VOICE_PROMPT),
-  ESPEAK_ENABLED: getEnv('ESPEAK_ENABLED', false, 'true').toLowerCase() === 'true',
-  ESPEAK_NG_COMMAND: getEnv('ESPEAK_NG_COMMAND', false, 'espeak-ng'),
-  ESPEAK_NG_VOICE: getEnv('ESPEAK_NG_VOICE', false, 'es-la'),
-  ESPEAK_NG_SPEED: Number.parseInt(getEnv('ESPEAK_NG_SPEED', false, '155'), 10) || 155,
+  TTS_TIMEOUT: getEnvNumber('TTS_TIMEOUT', 10000),
+  
   MAX_ITERATIONS: 10,
 };
