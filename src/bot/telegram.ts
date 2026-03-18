@@ -102,7 +102,7 @@ bot.command('voice', async (ctx) => {
   const action = args[0]?.toLowerCase();
   
   if (!isConfigured()) {
-    await ctx.reply('⚠️ TTS no está configurado. Usa IS_LOCAL=true para Qwen3-TTS o configura ElevenLabs/eSpeak NG en producción.');
+    await ctx.reply('⚠️ Error de configuración. Contacta al administrador.');
     return;
   }
   

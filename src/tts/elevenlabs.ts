@@ -54,5 +54,5 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
 }
 
 export function isConfigured(): boolean {
-  return IS_LOCAL;
+  return true;
 }
