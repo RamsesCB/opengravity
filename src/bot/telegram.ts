@@ -2,9 +2,6 @@ import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
-import { stopACPServerAndCleanup } from '../agent/orchestrator.js';
-import { getACPServer } from '../agent/opencode_acp_server.js';
-import { formatACPServerStopped } from '../agent/orchestrator_telegram.js';
 import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
 import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
 import { tmpdir } from 'os';
@@ -62,30 +59,7 @@ bot.command('start', (ctx) => {
 
 bot.command('stop', async (ctx) => {
   logger.info('Stop command received');
-  
-  const server = getACPServer();
-  if (!server) {
-    await ctx.reply('🛑 No hay servidor ACP activo.\n\nUsa /ejecutar para iniciar uno.');
-    return;
-  }
-  
-  await stopACPServerAndCleanup();
-  
-  const message = formatACPServerStopped();
-  
-  if (isVoiceEnabled(ctx.from?.id?.toString() || '')) {
-    try {
-      const audioBuffer = await textToSpeech(message);
-      if (audioBuffer) {
-        await sendTtsAudio(ctx, audioBuffer);
-        return;
-      }
-    } catch (error) {
-      logger.error('Error sending voice:', error);
-    }
-  }
-  
-  await ctx.reply(message);
+  await ctx.reply('🛑 El comando /stop está en mantenimiento.');
 });
 
 bot.command('transcribe', async (ctx) => {

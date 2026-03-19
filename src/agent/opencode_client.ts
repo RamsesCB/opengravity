@@ -5,9 +5,10 @@ import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
 
 export interface OpenCodeResult {
-  exitCode: number;
+  success: boolean;
   output: string;
   error?: string;
+  exitCode?: number;
 }
 
 export interface OpenCodeOptions {
@@ -15,6 +16,7 @@ export interface OpenCodeOptions {
   timeout?: number;
   model?: string;
   baseContext?: string;
+  workdir?: string;
 }
 
 export async function runOpenCode(
@@ -23,74 +25,82 @@ export async function runOpenCode(
   options?: OpenCodeOptions
 ): Promise<OpenCodeResult> {
   const timeout = options?.timeout || config.OPENCODE_TIMEOUT;
-  const continueFlag = options?.continue ? ['--continue'] : [];
-  const modelFlag = options?.model ? ['-m', options.model] : [];
-  const baseContext = options?.baseContext || '';
+  const workdir = options?.workdir || projectPath;
+  const model = options?.model;
+  
+  let fullTask = taskDescription;
 
-  let fullTask = '';
-  if (baseContext) {
-    fullTask = `${baseContext}\n\n---\n\nTAREA:\n${taskDescription}`;
-  } else {
-    fullTask = taskDescription;
+  const args: string[] = ['run'];
+  
+  if (model) {
+    args.push('--model', model);
   }
+  
+  if (options?.continue) {
+    args.push('--continue');
+  }
+  
+  args.push(fullTask);
 
-  logger.info(`Running opencode in ${projectPath} with model ${options?.model}: ${taskDescription.substring(0, 100)}...`);
-
-  const args = [
-    'run',
-    ...modelFlag,
-    fullTask,
-    ...continueFlag
-  ];
+  logger.info(`[OpenCode] Running task in ${workdir} with model ${model || 'default'}: ${taskDescription.substring(0, 100)}...`);
 
   const openCodeCmd = config.OPENCODE_COMMAND || 'opencode';
 
   return new Promise((resolve) => {
     const proc = spawn(openCodeCmd, args, {
-      cwd: projectPath,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: false,
-      env: { ...process.env }
+      cwd: workdir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        CI: 'true',
+        NO_COLOR: '1',
+        OPENCODE_DISABLE_AUTOUPDATE: 'true',
+      }
     });
 
     let output = '';
     let errorOutput = '';
     let timeoutId: NodeJS.Timeout;
 
-    proc.stdout.on('data', (data: Buffer) => {
-      output += data.toString();
+    proc.stdout?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      output += text;
+      logger.info(`[OpenCode] ${text.trim()}`);
     });
 
-    proc.stderr.on('data', (data: Buffer) => {
-      errorOutput += data.toString();
+    proc.stderr?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      errorOutput += text;
+      logger.warn(`[OpenCode Error] ${text.trim()}`);
     });
 
     proc.on('close', (code: number | null) => {
       clearTimeout(timeoutId);
-      logger.info(`OpenCode exited with code ${code}`);
+      logger.info(`[OpenCode] Process exited with code ${code}`);
       resolve({
-        exitCode: code || 0,
+        success: code === 0,
         output,
-        error: errorOutput || undefined
+        error: errorOutput || undefined,
+        exitCode: code || 0
       });
     });
 
     proc.on('error', (err: Error) => {
       clearTimeout(timeoutId);
-      logger.error('OpenCode process error:', err);
+      logger.error('[OpenCode] Process error:', err);
       resolve({
-        exitCode: 1,
+        success: false,
         output: '',
         error: err.message
       });
     });
 
     timeoutId = setTimeout(() => {
-      proc.kill();
+      proc.kill('SIGTERM');
       resolve({
-        exitCode: 124,
+        success: false,
         output,
-        error: 'Process timed out'
+        error: `Process timed out after ${timeout}ms`
       });
     }, timeout);
   });
@@ -102,14 +112,10 @@ export async function ensureProjectWorkspace(projectName: string): Promise<strin
   return projectPath;
 }
 
-export async function runAntigravity(projectPath: string): Promise<OpenCodeResult> {
-  return runOpenCode('Initialize antigravity environment', projectPath);
-}
-
 export async function checkOpenCodeAvailable(): Promise<boolean> {
   try {
-    const result = await runOpenCode('version check', '/tmp', { timeout: 5000 });
-    return result.exitCode === 0;
+    const result = await runOpenCode('test', '/tmp', { timeout: 10000 });
+    return result.success;
   } catch {
     return false;
   }

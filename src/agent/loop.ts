@@ -4,25 +4,11 @@ import { memory } from '../memory/firestore.js';
 import { registry } from '../tools/registry.js';
 import { chatCompletion } from './llm.js';
 import { systemPrompt } from './prompt.js';
-import { Orchestrator, executeWithOrchestrator, stopACPServerAndCleanup } from './orchestrator.js';
-import { getACPServer } from './opencode_acp_server.js';
+import { Orchestrator } from './orchestrator.js';
 import type { OrchestratorResult } from './orchestrator.js';
-import { buildTelegramNotifications, formatQuestionNotification, formatProgressNotification, formatACPServerStarted } from './orchestrator_telegram.js';
-import { sendProgressAudio, sendQuestionAudio } from './audio_progress.js';
-import type { ExecutionState } from './executor.js';
-import { isVoiceEnabled, isAutoRespondEnabled } from '../tts/elevenlabs.js';
+import { isVoiceEnabled, textToSpeech } from '../tts/elevenlabs.js';
 
 const MAX_TOOL_CONTENT_LENGTH = 500;
-
-let activeOrchestrator: Orchestrator | null = null;
-
-export function setActiveOrchestrator(orchestrator: Orchestrator | null): void {
-  activeOrchestrator = orchestrator;
-}
-
-export function getActiveOrchestrator(): Orchestrator | null {
-  return activeOrchestrator;
-}
 
 function truncateToolMessages(messages: any[]): any[] {
   return messages.map(msg => {
@@ -39,34 +25,14 @@ function truncateToolMessages(messages: any[]): any[] {
 export async function processUserMessage(userId: string, content: string, ctx?: any): Promise<string> {
   await memory.addMessage(userId, 'user', content);
 
-  const history = await memory.getHistory(userId, 12);
-  const truncatedHistory = truncateToolMessages(history);
-  
-  if (content.startsWith('/orchestrate ') || content.startsWith('/ejecutar ')) {
-    const task = content.replace(/^\/(orchestrate|ejecutar)\s+/, '');
+  if (content.startsWith('/ejecutar ')) {
+    const task = content.replace(/^\/ejecutar\s+/, '');
     return await processOrchestratedTask(userId, task, ctx);
   }
 
-  if (content.match(/^[0-9]+$/)) {
-    const selectedOption = parseInt(content);
-    const orchestrator = getActiveOrchestrator();
-    if (orchestrator && orchestrator.hasPendingQuestion()) {
-      const question = orchestrator.getPendingQuestion();
-      if (question && question.options && question.options.length >= selectedOption) {
-        orchestrator.sendAnswer(question.options[selectedOption - 1]);
-        return `✅ Respuesta "${question.options[selectedOption - 1]}" enviada. Continuando ejecución...`;
-      }
-    }
-  }
-
-  if (content.toLowerCase() !== '/stop' && content !== '/stop') {
-    const orchestrator = getActiveOrchestrator();
-    if (orchestrator && orchestrator.hasPendingQuestion()) {
-      orchestrator.sendAnswer(content);
-      return `✅ Respuesta "${content}" enviada. Continuando ejecución...`;
-    }
-  }
-
+  const history = await memory.getHistory(userId, 12);
+  const truncatedHistory = truncateToolMessages(history);
+  
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
     ...truncatedHistory
@@ -151,80 +117,37 @@ async function processOrchestratedTask(userId: string, task: string, ctx?: any):
   logger.info(`Orchestrating task for user ${userId}: ${task}`);
 
   const orchestrator = new Orchestrator({
-    userId,
-    ctx,
-    onStateChange: async (state: ExecutionState, data?: any) => {
-      logger.info(`Orchestrator state: ${state}`, data);
-      
-      if (ctx && (state === 'executing' || state === 'validating')) {
-        const message = formatProgressNotification(
-          data?.taskId ? parseInt(data.taskId) : 1,
-          3,
-          `Ejecutando ${state}`
-        );
-        
-        if (isVoiceEnabledInContext(ctx, userId)) {
-          await sendProgressAudio(ctx, userId, { step: 1, totalSteps: 3, message: state });
-        } else {
-          await ctx.reply(message);
-        }
-      }
-    },
-    onQuestion: async (question) => {
-      logger.info(`Question received: ${question.text}`);
-      
-      if (ctx) {
-        await sendQuestionAudio(ctx, userId, question.text, question.options || []);
-        
-        const textMessage = formatQuestionNotification(question);
-        await ctx.reply(textMessage);
-        
-        setActiveOrchestrator(orchestrator);
-      }
-    },
-    onProgress: async (step, total, message) => {
-      if (ctx) {
-        if (isVoiceEnabledInContext(ctx, userId)) {
-          await sendProgressAudio(ctx, userId, { step, totalSteps: total, message });
-        } else {
-          await ctx.reply(formatProgressNotification(step, total, message));
-        }
-      }
-    }
+    userId
   });
-
-  setActiveOrchestrator(orchestrator);
 
   try {
     const result = await orchestrator.execute(task);
 
-    const notifications = buildTelegramNotifications(result);
-    let finalMessage = notifications.join('\n\n');
-
-    if (result.pendingQuestion) {
-      finalMessage += '\n\n' + formatQuestionNotification(result.pendingQuestion);
-    }
-
-    await memory.addMessage(userId, 'assistant', finalMessage);
-    
-    if (result.pendingQuestion) {
-      setActiveOrchestrator(orchestrator);
+    let summary = '';
+    if (result.success) {
+      summary = `✅ *Tarea completada exitosamente*\n\n`;
+      summary += result.steps.map((s, i) => 
+        `${s.status === 'done' ? '✅' : '❌'} Paso ${i + 1}: ${s.description}`
+      ).join('\n');
+      summary += `\n\n📁 Proyecto: \`${result.projectName}\``;
     } else {
-      setActiveOrchestrator(null);
+      summary = `⚠️ *Tarea completada con errores*\n\n`;
+      summary += result.steps.map((s, i) => 
+        `${s.status === 'done' ? '✅' : '❌'} Paso ${i + 1}: ${s.description}`
+      ).join('\n');
+      if (result.errors.length > 0) {
+        summary += `\n\n❌ Errores:\n${result.errors.map(e => `- ${e}`).join('\n')}`;
+      }
     }
-    
-    return finalMessage;
+
+    await memory.addMessage(userId, 'assistant', summary);
+    return summary;
   } catch (error: any) {
     logger.error('Orchestrator failed:', error);
-    setActiveOrchestrator(null);
-    const errorMsg = `❌ Error en el Orquestador: ${error.message}`;
+    const errorMsg = `❌ *Error en el Orquestador:* ${error.message}`;
     await memory.addMessage(userId, 'assistant', errorMsg);
     return errorMsg;
   }
-}
-
-function isVoiceEnabledInContext(ctx: any, userId: string): boolean {
-  return isVoiceEnabled(userId) && isAutoRespondEnabled(userId);
 }
 
 export { Orchestrator };
