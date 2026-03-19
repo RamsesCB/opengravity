@@ -77,7 +77,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 │   │  │  Qwen3-TTS     │    │   text2wav (Production)    │  │  │
 │   │  │  (Local GPU)    │    │   - Pure npm package       │  │  │
 │   │  │  - Voice Design │    │   - No external deps       │  │  │
-│   │  │  - Custom promt │    │   - 150 char limit         │  │  │
+│   │  │  - Custom promt │    │   - 250 char limit         │  │  │
 │   │  └────────┬────────┘    └──────────────┬──────────────┘  │  │
 │   │           │                              │                  │  │
 │   │           └──────────────┬───────────────┘                  │  │
@@ -127,15 +127,15 @@ OpenGRBC supports **two voice (TTS) modes**:
 | ✅ Works on any Node.js server | ❌ Menor calidad natural |
 | ✅ No API keys needed | |
 | ✅ No IP blocking issues | |
-| ✅ OOM protection (150 char limit) | |
+| ✅ OOM protection (250 char limit) | |
 
 **Behavior:**
 - **Local mode (`IS_LOCAL=true`)**: Qwen3-TTS (GPU, custom voice) → text2wav fallback
-- **Production mode (`IS_LOCAL=false`)**: text2wav (npm package, 150 char limit)
+- **Production mode (`IS_LOCAL=false`)**: text2wav (npm package, 250 char limit)
 
 **TTS Limits (Production):**
-- `MAX_TTS_CHARS`: 150 characters (prevents OOM on free tier)
-- `MAX_AUDIO_BYTES`: 500KB hard limit
+- `MAX_TTS_CHARS`: 250 characters (~40-50 words)
+- `MAX_AUDIO_BYTES`: 1.5 MB hard limit
 - Responses exceeding limits will be sent as text
 
 ---
