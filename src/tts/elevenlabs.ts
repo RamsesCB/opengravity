@@ -6,6 +6,7 @@ const IS_LOCAL = config.IS_LOCAL;
 const LOCAL_TTS_URL = config.LOCAL_TTS_URL;
 const VOICE_PROMPT = config.VOICE_PROMPT;
 const TTS_TIMEOUT = config.TTS_TIMEOUT;
+const LOCAL_TTS_TIMEOUT = 60000;
 
 const MAX_TTS_CHARS = 300;
 
@@ -37,26 +38,77 @@ function truncateText(text: string, maxChars: number): string {
   return text.substring(0, maxChars).trim() + '...';
 }
 
-export async function textToSpeech(text: string): Promise<Buffer | null> {
-  if (IS_LOCAL) {
-    try {
-      const response = await fetch(`${LOCAL_TTS_URL}/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language: 'es', voice_prompt: VOICE_PROMPT, use_voice_design: true })
-      });
+async function generateWithLocalTTS(text: string): Promise<Buffer | null> {
+  if (!IS_LOCAL) return null;
+  
+  try {
+    logger.info(`Generating speech with local Qwen3-TTS...`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LOCAL_TTS_TIMEOUT);
+    
+    const response = await fetch(`${LOCAL_TTS_URL}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        text, 
+        language: 'es', 
+        voice_prompt: VOICE_PROMPT, 
+        use_voice_design: true 
+      }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        logger.error(`Local TTS error: ${response.status}`);
-        return null;
-      }
-
-      const result = await response.json();
-      return result.audio ? Buffer.from(result.audio, 'base64') : null;
-    } catch (error) {
-      logger.error('Error connecting to local TTS server:', error);
+    if (!response.ok) {
+      logger.error(`Local TTS error: ${response.status}`);
       return null;
     }
+
+    const result = await response.json();
+    
+    if (result.error) {
+      logger.error(`Local TTS error: ${result.error}`);
+      return null;
+    }
+    
+    if (!result.audio) {
+      logger.error('Local TTS returned no audio');
+      return null;
+    }
+    
+    const audioBuffer = Buffer.from(result.audio, 'base64');
+    
+    const hasAudio = audioBuffer.length > 44 && (() => {
+      const int16 = new Int16Array(audioBuffer.buffer, audioBuffer.byteOffset + 44);
+      let maxAmp = 0;
+      for (let i = 0; i < Math.min(int16.length, 10000); i++) {
+        const amp = Math.abs(int16[i]);
+        if (amp > maxAmp) maxAmp = amp;
+      }
+      return maxAmp > 10;
+    })();
+    if (!hasAudio) {
+      logger.warn('Local TTS returned silent audio');
+      return null;
+    }
+    
+    logger.info(`Generated local TTS audio: ${audioBuffer.length} bytes`);
+    return audioBuffer;
+  } catch (error) {
+    logger.error('Error connecting to local TTS server:', error);
+    return null;
+  }
+}
+
+export async function textToSpeech(text: string): Promise<Buffer | null> {
+  if (IS_LOCAL) {
+    const localAudio = await generateWithLocalTTS(text);
+    if (localAudio) {
+      return localAudio;
+    }
+    logger.info('Local TTS failed, falling back to text2wav...');
   }
   
   try {
@@ -83,5 +135,5 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
 }
 
 export function isConfigured(): boolean {
-  return true;
+  return IS_LOCAL || true;
 }
