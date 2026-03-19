@@ -43,5 +43,9 @@ export const config = {
   VOICE_PROMPT: getEnv('VOICE_PROMPT', false, DEFAULT_VOICE_PROMPT),
   TTS_TIMEOUT: getEnvNumber('TTS_TIMEOUT', 10000),
   
+  // ElevenLabs Configuration
+  ELEVENLABS_API_KEY: getEnv('ELEVENLABS_API_KEY', false),
+  ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'IKne3meq5aSn9XLyUdCD'),
+  
   MAX_ITERATIONS: 10,
 };
