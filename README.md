@@ -34,7 +34,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 |---------|-------------|
 | 🤖 **Triple LLM Fallback** | Groq → Gemini Flash → OpenRouter automatic failover |
 | 🎤 **Voice Messages** | Send voice, receive voice responses |
-| 🔊 **TTS Options** | Local: Qwen3-TTS (GPU) \| Production: eSpeak NG (lightweight) |
+| 🔊 **TTS Options** | Local: Qwen3-TTS (GPU) \| Production: text2wav (npm) |
 | 💾 **Persistent Memory** | Firebase Firestore stores conversation history |
 | 🔒 **Access Control** | Whitelist-only user access |
 | 📝 **Tool Calling** | Execute functions and tools via AI |
@@ -74,18 +74,14 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 │   │                    Voice Layer                            │  │
 │   ├──────────────────────────────────────────────────────────┤  │
 │   │  ┌─────────────────┐    ┌─────────────────────────────┐  │  │
-│   │  │  ElevenLabs    │    │   Qwen3-TTS (Local)        │  │  │
-│   │  │     API        │    │   - Voice Design (GPU)      │  │  │
-│   │  │  (cloud)       │    │   - Custom prompts         │  │  │
+│   │  │  Qwen3-TTS     │    │   text2wav (Production)    │  │  │
+│   │  │  (Local GPU)    │    │   - Pure npm package       │  │  │
+│   │  │  - Voice Design │    │   - No external deps       │  │  │
+│   │  │  - Custom promt │    │   - 150 char limit         │  │  │
 │   │  └────────┬────────┘    └──────────────┬──────────────┘  │  │
 │   │           │                              │                  │  │
-│   │  ┌────────┴────────┐                   │                  │  │
-│   │  │  eSpeak NG     │◄──────────────────┘                  │  │
-│   │  │  (production)  │   (lightweight fallback)             │  │
-│   │  └─────────────────┘                                       │  │
-│   │           │                                               │  │
-│   │           └──────────────┬──────────────┘                  │  │
-│   │                          ▼                                 │  │
+│   │           └──────────────┬───────────────┘                  │  │
+│   │                          │                                  │  │
 │   │              ┌─────────────────────┐                      │  │
 │   │              │  Whisper (Groq API) │                      │  │
 │   │              │   Transcription     │                      │  │
@@ -123,7 +119,7 @@ OpenGRBC supports **two voice (TTS) modes**:
 | ✅ No cloud dependency | ❌ Only works when running locally |
 | ✅ No account/API needed | |
 
-### Option B: Production Voice (text2wav)
+### Option B: Production Voice (text2wav) - Default
 
 | Pros | Cons |
 |------|------|
@@ -131,10 +127,16 @@ OpenGRBC supports **two voice (TTS) modes**:
 | ✅ Works on any Node.js server | ❌ Menor calidad natural |
 | ✅ No API keys needed | |
 | ✅ No IP blocking issues | |
+| ✅ OOM protection (150 char limit) | |
 
 **Behavior:**
-- **Local mode (`IS_LOCAL=true`)**: Qwen3-TTS (GPU, custom voice)
-- **Production mode (`IS_LOCAL=false`)**: text2wav (npm package)
+- **Local mode (`IS_LOCAL=true`)**: Qwen3-TTS (GPU, custom voice) → text2wav fallback
+- **Production mode (`IS_LOCAL=false`)**: text2wav (npm package, 150 char limit)
+
+**TTS Limits (Production):**
+- `MAX_TTS_CHARS`: 150 characters (prevents OOM on free tier)
+- `MAX_AUDIO_BYTES`: 500KB hard limit
+- Responses exceeding limits will be sent as text
 
 ---
 
@@ -314,12 +316,12 @@ personality: Íntegro, líder corporativo, deceno y confiable
 
 ### ⚠️ Important: Voice in Production
 
-| Mode | Voice Support |
-|------|---------------|
-| **Render/Cloud** | text2wav (npm package - works automatically) |
-| **Local** | Qwen3-TTS with custom voice prompts |
+| Mode | Voice | Memory Protection |
+|------|-------|-------------------|
+| **Render/Cloud** | text2wav (npm) | ✅ 150 char limit, 500KB audio limit |
+| **Local** | Qwen3-TTS → text2wav | ✅ 60s timeout, silent detection |
 
-**Note:** No additional installation required! text2wav is a pure npm package.
+**Note:** No additional installation required! text2wav is a pure npm package. OOM protection is built-in.
 
 ### ✅ Definitive Plan (March 2026)
 
@@ -348,7 +350,12 @@ Whisper limit reference (free tier): **20 RPM** on `whisper-large-v3`, equivalen
      - **Start Command**: `npm run start`
 
 3. **Set Environment Variables**
-   Add all required variables in Render's dashboard.
+   Add all required variables in Render's dashboard:
+
+   | Variable | Value | Notes |
+   |----------|-------|-------|
+   | `NODE_OPTIONS` | `--max-old-space-size=256` | Optional: limits RAM to prevent OOM |
+   | `TTS_TIMEOUT` | `10000` | 10 second timeout for TTS |
 
 4. **Configure Webhook**
    ```
@@ -440,9 +447,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - [Groq](https://groq.com/) - Fast LLM Inference
 - [Google Gemini](https://gemini.google.com/) - AI Models
 - [OpenRouter](https://openrouter.ai/) - Unified AI Access
-- [ElevenLabs](https://elevenlabs.io/) - Voice Synthesis
 - [Qwen](https://qwen.ai/) - Open Source TTS Models
-- [eSpeak NG](https://github.com/espeak-ng/espeak-ng) - Lightweight offline TTS fallback
+- [text2wav](https://www.npmjs.com/package/text2wav) - Pure npm TTS for production
 - [Firebase](https://firebase.google.com/) - Backend Services
 
 ---
