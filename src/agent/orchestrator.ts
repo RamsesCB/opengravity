@@ -7,14 +7,13 @@ export interface OrchestratorOptions {
   userId: string;
   projectName?: string;
   onProgress?: (message: string) => Promise<void>;
-  onStepComplete?: (step: any) => Promise<void>;
 }
 
 export interface OrchestratorResult {
   success: boolean;
   summary: string;
   state: string;
-  steps: any[];
+  output: string;
   errors: string[];
   projectName: string;
 }
@@ -39,10 +38,10 @@ export class Orchestrator {
     try {
       this.executor = new Executor(
         this.getProjectPath(),
+        this.projectName,
         taskDescription,
         {
-          onProgress: async (message) => logger.info(`[Orchestrator] ${message}`),
-          onStepComplete: async (step) => logger.info(`[Orchestrator] Step ${step.id} completed`)
+          onProgress: async (message) => logger.info(`[Orchestrator] ${message}`)
         }
       );
 
@@ -52,7 +51,7 @@ export class Orchestrator {
         success: result.success,
         summary: result.summary,
         state: result.state,
-        steps: result.steps,
+        output: result.output,
         errors: result.errors,
         projectName: this.projectName
       };
@@ -62,7 +61,7 @@ export class Orchestrator {
         success: false,
         summary: error.message,
         state: 'failed',
-        steps: [],
+        output: '',
         errors: [error.message],
         projectName: this.projectName
       };

@@ -126,18 +126,15 @@ async function processOrchestratedTask(userId: string, task: string, ctx?: any):
     let summary = '';
     if (result.success) {
       summary = `✅ *Tarea completada exitosamente*\n\n`;
-      summary += result.steps.map((s, i) => 
-        `${s.status === 'done' ? '✅' : '❌'} Paso ${i + 1}: ${s.description}`
-      ).join('\n');
-      summary += `\n\n📁 Proyecto: \`${result.projectName}\``;
+      summary += `📁 Proyecto: \`${result.projectName}\`\n\n`;
+      summary += `*Output:*\n\`\`\`\n${result.output.substring(0, 1000)}\n\`\`\``;
     } else {
       summary = `⚠️ *Tarea completada con errores*\n\n`;
-      summary += result.steps.map((s, i) => 
-        `${s.status === 'done' ? '✅' : '❌'} Paso ${i + 1}: ${s.description}`
-      ).join('\n');
+      summary += `📁 Proyecto: \`${result.projectName}\`\n\n`;
       if (result.errors.length > 0) {
-        summary += `\n\n❌ Errores:\n${result.errors.map(e => `- ${e}`).join('\n')}`;
+        summary += `❌ Errores:\n${result.errors.map(e => `- ${e}`).join('\n')}`;
       }
+      summary += `\n\n*Output parcial:*\n\`\`\`\n${result.output.substring(0, 500)}\n\`\`\``;
     }
 
     await memory.addMessage(userId, 'assistant', summary);
