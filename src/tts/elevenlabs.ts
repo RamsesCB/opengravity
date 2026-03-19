@@ -6,7 +6,7 @@ const IS_LOCAL = config.IS_LOCAL;
 const LOCAL_TTS_URL = config.LOCAL_TTS_URL;
 const VOICE_PROMPT = config.VOICE_PROMPT;
 const TTS_TIMEOUT = config.TTS_TIMEOUT;
-const LOCAL_TTS_TIMEOUT = 60000;
+const LOCAL_TTS_TIMEOUT = 300000;
 
 const MAX_TTS_CHARS = 250;
 const MAX_AUDIO_BYTES = 1500000;
@@ -97,8 +97,12 @@ async function generateWithLocalTTS(text: string): Promise<Buffer | null> {
     
     logger.info(`Generated local TTS audio: ${audioBuffer.length} bytes`);
     return audioBuffer;
-  } catch (error) {
-    logger.error('Error connecting to local TTS server:', error);
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      logger.error(`Local TTS timeout after ${LOCAL_TTS_TIMEOUT}ms - server may be slow or overloaded`);
+    } else {
+      logger.error('Error connecting to local TTS server:', error);
+    }
     return null;
   }
 }
