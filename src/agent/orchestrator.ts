@@ -78,11 +78,11 @@ export class Orchestrator {
       throw new Error(`Unknown model: ${this.decision.modelId}`);
     }
 
-    this.log(`Starting ACP server for model ${model.opencodeModel}`);
+    this.log(`Starting ACP server with OpenCode default model for task type: ${model.type}`);
 
     this.acpServer = new ACPServer(
       `${config.LOCAL_PROJECTS_PATH}/${this.projectName}`,
-      model.opencodeModel
+      undefined
     );
 
     await this.acpServer.start();

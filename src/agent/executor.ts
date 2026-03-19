@@ -208,12 +208,10 @@ export class Executor {
   private async executeTask(task: AtomicTask): Promise<boolean> {
     this.setState('validating', { taskId: task.id });
     this.logs.push(`Executing task: ${task.description.substring(0, 100)}...`);
-    this.logs.push(`Using model: ${this.model.opencodeModel}`);
+    this.logs.push(`Using OpenCode default model for task type: ${this.model.type}`);
 
     try {
-      const result = await runOpenCode(task.description, this.projectPath, {
-        model: this.model.opencodeModel
-      });
+      const result = await runOpenCode(task.description, this.projectPath);
       
       if (result.exitCode === 0) {
         this.logs.push(`Task ${task.id} completed successfully`);
