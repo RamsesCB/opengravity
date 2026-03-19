@@ -8,7 +8,8 @@ const VOICE_PROMPT = config.VOICE_PROMPT;
 const TTS_TIMEOUT = config.TTS_TIMEOUT;
 const LOCAL_TTS_TIMEOUT = 60000;
 
-const MAX_TTS_CHARS = 300;
+const MAX_TTS_CHARS = 150;
+const MAX_AUDIO_BYTES = 500000;
 
 interface UserVoiceSettings {
   enabled: boolean;
@@ -113,21 +114,30 @@ export async function textToSpeech(text: string): Promise<Buffer | null> {
   
   try {
     const truncatedText = truncateText(text, MAX_TTS_CHARS);
+    if (truncatedText.length < text.length) {
+      logger.info(`TTS text truncated: ${text.length} → ${truncatedText.length} chars`);
+    }
     logger.info(`Generating speech with text2wav (${truncatedText.length} chars)...`);
     
     const audioBuffer = await Promise.race([
-      text2wav(truncatedText, { voice: 'es', speed: 175 }),
+      text2wav(truncatedText, { voice: 'es', speed: 155 }),
       new Promise<null>((_, reject) => 
         setTimeout(() => reject(new Error('TTS timeout')), TTS_TIMEOUT)
       )
     ]) as Uint8Array;
     
-    if (audioBuffer && audioBuffer.length > 0) {
-      logger.info(`Generated audio: ${audioBuffer.length} bytes`);
-      return Buffer.from(audioBuffer);
+    if (!audioBuffer || audioBuffer.length === 0) {
+      logger.warn('text2wav returned empty audio');
+      return null;
     }
     
-    return null;
+    if (audioBuffer.length > MAX_AUDIO_BYTES) {
+      logger.warn(`text2wav audio too large: ${audioBuffer.length} bytes > ${MAX_AUDIO_BYTES} limit, skipping audio`);
+      return null;
+    }
+    
+    logger.info(`Generated audio: ${audioBuffer.length} bytes`);
+    return Buffer.from(audioBuffer);
   } catch (error) {
     logger.error('Error generating speech with text2wav:', error);
     return null;
