@@ -58,5 +58,5 @@ export const config = {
   // OpenCode Configuration
   OPENCODE_COMMAND: getEnv('OPENCODE_COMMAND', false, 'opencode'),
   OPENCODE_TIMEOUT: getEnvNumber('OPENCODE_TIMEOUT', 300000),
-  OPENCODE_DEFAULT_MODEL: getEnv('OPENCODE_DEFAULT_MODEL', false, 'minimax/minimax-m2.5'),
+  OPENCODE_DEFAULT_MODEL: getEnv('OPENCODE_DEFAULT_MODEL', false, 'MiniMax-M2.5'),
 };
