@@ -43,7 +43,7 @@ async function generateWithLocalTTS(text: string): Promise<Buffer | null> {
   if (!IS_LOCAL) return null;
   
   try {
-    logger.info(`Generating speech with local Qwen3-TTS...`);
+    logger.info(`Generating speech with local Qwen3-TTS (no character limit)...`);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), LOCAL_TTS_TIMEOUT);
@@ -103,13 +103,61 @@ async function generateWithLocalTTS(text: string): Promise<Buffer | null> {
   }
 }
 
+async function isLocalTTSAvailable(): Promise<boolean> {
+  if (!IS_LOCAL) return false;
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    try {
+      const healthResponse = await fetch(`${LOCAL_TTS_URL}/health`, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return healthResponse.ok;
+    } catch {
+      clearTimeout(timeoutId);
+      
+      const testController = new AbortController();
+      const testTimeoutId = setTimeout(() => testController.abort(), 5000);
+      
+      try {
+        const testResponse = await fetch(`${LOCAL_TTS_URL}/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: 'test', language: 'es' }),
+          signal: testController.signal
+        });
+        clearTimeout(testTimeoutId);
+        return testResponse.ok || testResponse.status === 400;
+      } catch {
+        clearTimeout(testTimeoutId);
+        return false;
+      }
+    }
+  } catch {
+    return false;
+  }
+}
+
 export async function textToSpeech(text: string): Promise<Buffer | null> {
   if (IS_LOCAL) {
-    const localAudio = await generateWithLocalTTS(text);
-    if (localAudio) {
-      return localAudio;
+    const isAvailable = await isLocalTTSAvailable();
+    
+    if (isAvailable) {
+      const localAudio = await generateWithLocalTTS(text);
+      if (localAudio) {
+        return localAudio;
+      }
     }
-    logger.info('Local TTS failed, falling back to text2wav...');
+    
+    if (!isAvailable) {
+      logger.info('Local TTS server not available, falling back to text2wav...');
+    } else {
+      logger.info('Local TTS failed, falling back to text2wav...');
+    }
   }
   
   try {
