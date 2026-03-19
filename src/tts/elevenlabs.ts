@@ -8,8 +8,8 @@ const VOICE_PROMPT = config.VOICE_PROMPT;
 const TTS_TIMEOUT = config.TTS_TIMEOUT;
 const LOCAL_TTS_TIMEOUT = 60000;
 
-const MAX_TTS_CHARS = 150;
-const MAX_AUDIO_BYTES = 500000;
+const MAX_TTS_CHARS = 250;
+const MAX_AUDIO_BYTES = 1500000;
 
 interface UserVoiceSettings {
   enabled: boolean;
