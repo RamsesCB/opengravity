@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import { generatePlanWithMiniMax, runOpenCodeTask, PlanResult } from './minimax_client.js';
+import { generatePlanWithMiniMax, runOpenCodeTask, OPENCODE_FREE_MODELS, PlanResult } from './minimax_client.js';
 import { config } from '../config.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -7,6 +7,7 @@ import * as path from 'path';
 export type ExecutionState = 
   | 'initialized'
   | 'planning'
+  | 'model_selection'
   | 'executing'
   | 'completed'
   | 'failed';
@@ -62,6 +63,36 @@ export class Executor {
     }
   }
 
+  private selectModelForStep(stepIndex: number, totalSteps: number, task: string): string {
+    const taskLower = task.toLowerCase();
+    
+    if (taskLower.includes('review') || taskLower.includes('análisis') || taskLower.includes('debug')) {
+      return 'opencode/big-pickle';
+    }
+    
+    if (taskLower.includes('api') || taskLower.includes('tool') || taskLower.includes('automatiz')) {
+      return 'opencode/nemotron-3-super-free';
+    }
+    
+    if (taskLower.includes('código') || taskLower.includes('program') || taskLower.includes('crear archivo') || taskLower.includes('python') || taskLower.includes('javascript')) {
+      return 'opencode/mimo-v2-pro-free';
+    }
+    
+    if (taskLower.includes('document') || taskLower.includes('presentación') || taskLower.includes('diseño')) {
+      return 'opencode/minimax-m2.5-free';
+    }
+    
+    if (stepIndex === 0) {
+      return 'opencode/minimax-m2.5-free';
+    }
+    
+    if (totalSteps === 1) {
+      return 'opencode/mimo-v2-omni-free';
+    }
+    
+    return 'opencode/mimo-v2-pro-free';
+  }
+
   async run(): Promise<ExecutionResult> {
     try {
       await this.ensureWorkspace();
@@ -73,31 +104,39 @@ export class Executor {
       this.log(`Recommended model: ${planResult.recommendedModel}`);
       this.log(`Steps: ${planResult.steps.length}`);
 
+      this.state = 'model_selection';
+      this.log('Phase 2: Selecting best model for execution...');
+
+      const defaultModel = this.selectModelForStep(0, planResult.steps.length, this.initialTask);
+      this.log(`Selected execution model: ${defaultModel}`);
+
       this.state = 'executing';
-      this.log('Phase 2: Executing with OpenCode...');
+      this.log(`Phase 3: Executing ${planResult.steps.length} step(s)...`);
 
       let allOutput = '';
       let success = true;
 
       for (let i = 0; i < planResult.steps.length; i++) {
         const step = planResult.steps[i];
-        this.log(`Executing step ${i + 1}/${planResult.steps.length}: ${step.substring(0, 50)}...`);
+        const stepModel = this.selectModelForStep(i, planResult.steps.length, step);
+        this.log(`Step ${i + 1}/${planResult.steps.length}: ${step.substring(0, 50)}...`);
+        this.log(`  Using model: ${stepModel}`);
 
         const result = await runOpenCodeTask(
           step,
           this.projectPath,
-          planResult.recommendedModel,
+          stepModel,
           180000
         );
 
-        allOutput += `\n=== STEP ${i + 1} ===\n${result.output}`;
+        allOutput += `\n=== STEP ${i + 1} (${stepModel}) ===\n${result.output}`;
 
         if (!result.success) {
           success = false;
           this.errors.push(`Step ${i + 1} failed: ${result.error}`);
-          this.log(`Step ${i + 1} failed`);
+          this.log(`Step ${i + 1} failed: ${result.error}`);
         } else {
-          this.log(`Step ${i + 1} completed`);
+          this.log(`Step ${i + 1} completed successfully`);
         }
       }
 
@@ -107,7 +146,7 @@ export class Executor {
         success,
         state: this.state,
         summary: success 
-          ? `Task completed successfully with ${planResult.recommendedModel}` 
+          ? `Task completed successfully using OpenCode free models` 
           : `Task completed with ${this.errors.length} error(s)`,
         output: allOutput,
         plan: planResult,

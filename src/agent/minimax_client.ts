@@ -15,50 +15,122 @@ export interface PlanResult {
   steps: string[];
 }
 
+export const OPENCODE_FREE_MODELS = [
+  'opencode/big-pickle',
+  'opencode/gpt-5-nano',
+  'opencode/mimo-v2-omni-free',
+  'opencode/mimo-v2-pro-free',
+  'opencode/minimax-m2.5-free',
+  'opencode/nemotron-3-super-free'
+] as const;
+
+export type OpenCodeFreeModel = typeof OPENCODE_FREE_MODELS[number];
+
+const MODEL_SELECTION_PROMPT = `Eres el Selector de Modelo de OpenCode.
+
+## TUS MODELOS GRATIS DISPONIBLES
+\`\`\`
+opencode/minimax-m2.5-free    → Arquitectura, lógica compleja, documentos
+opencode/big-pickle          → Code review, análisis profundo
+opencode/mimo-v2-omni-free   → Tareas simples, rápido
+opencode/mimo-v2-pro-free    → Programación, código
+opencode/nemotron-3-super-free → Agente, tool calling, APIs
+opencode/gpt-5-nano          → Muy rápido, tareas básicas
+\`\`\`
+
+## TAREA
+Selecciona el mejor modelo para esta tarea: %TASK%
+
+Responde SOLO con el nombre del modelo (ej: opencode/minimax-m2.5-free)`;
+
 const PLAN_PROMPT = `Eres el Planificador Maestro de OpenGravity.
 
-## TU TAREA
-Recibirás una tarea del usuario. Tu trabajo es:
-1. Crear un PLAN detallado para ejecutarla
-2. RECOMENDAR el mejor modelo de OpenCode para ejecutarla
-3. Crear el NOMBRE del proyecto
-
-## MODELOS DE OPENCODE (usa solo estos)
-- MiniMax-M2.5: Para arquitectura, lógica compleja, documentos
-- MiniMax-M2.7: Mejor para código general, más reciente
-- Kimi-K2.5: Para análisis y review profundo
-- GLM-5: Rápido para tareas simples
+## MODELOS GRATIS DE OPENCODE
+- opencode/minimax-m2.5-free: Arquitectura, lógica compleja, documentos
+- opencode/big-pickle: Code review, análisis profundo
+- opencode/mimo-v2-omni-free: Tareas simples, rápido
+- opencode/mimo-v2-pro-free: Programación, código
+- opencode/nemotron-3-super-free: Agente, tool calling
+- opencode/gpt-5-nano: Muy rápido, básico
 
 ## ESTRUCTURA DE PLAN
-\`\`\`
+Responde EXACTAMENTE así:
 PROYECTO: [nombre-en-kebab-case]
-MODELO_RECOMENDADO: [uno de los modelos de arriba]
+MODELO: [uno-de-los-modelos-de-arriba]
 PASOS:
-1. [descripción del paso 1]
-2. [descripción del paso 2]
+1. [paso 1]
+2. [paso 2]
 3. [etc]
-
-PLAN_DETALLADO:
-[tarea 1]
----
-[tarea 2]
----
-[tarea 3]
-\`\`\`
 
 ## REGLAS
 - Máximo 5 pasos
 - Cada paso debe ser ejecutable por OpenCode
-- El modelo debe ser el más apropiado para la tarea
-- Usa kebab-case para el nombre del proyecto
+- Usa el modelo más apropiado para la tarea
 
-## ARCHIVOS DE REFERENCIA
-- Plan: /home/slerx/Datos/Proyectos/Plan_structure.md
-- Error: /home/slerx/Datos/Proyectos/Error_structure.md
+TAREA: %TASK%`;
 
-TAREA: %TASK%
+export async function selectBestModel(task: string): Promise<string> {
+  logger.info(`[MiniMax] Selecting best model for: ${task.substring(0, 50)}...`);
 
-Responde SOLO con el formato de estructura definido arriba, sin explicaciones adicionales.`;
+  return new Promise((resolve) => {
+    const proc = spawn('opencode', ['run', '--model', 'minimax/MiniMax-M2.5', MODEL_SELECTION_PROMPT.replace('%TASK%', task)], {
+      cwd: '/home/slerx/Datos/Proyectos',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        CI: 'true',
+        NO_COLOR: '1',
+        OPENCODE_DISABLE_AUTOUPDATE: 'true'
+      }
+    });
+
+    let output = '';
+    let timeoutId: NodeJS.Timeout;
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      output += data.toString();
+    });
+
+    proc.on('close', () => {
+      clearTimeout(timeoutId);
+      const model = parseModelSelection(output);
+      logger.info(`[MiniMax] Selected model: ${model}`);
+      resolve(model);
+    });
+
+    proc.on('error', () => {
+      clearTimeout(timeoutId);
+      resolve('opencode/minimax-m2.5-free');
+    });
+
+    timeoutId = setTimeout(() => {
+      proc.kill('SIGTERM');
+      resolve('opencode/minimax-m2.5-free');
+    }, 60000);
+  });
+}
+
+function parseModelSelection(output: string): string {
+  for (const model of OPENCODE_FREE_MODELS) {
+    if (output.includes(model)) {
+      return model;
+    }
+  }
+  
+  const line = output.split('\n').find(l => 
+    l.includes('opencode/') || l.includes('mimo') || 
+    l.includes('pickle') || l.includes('nemotron')
+  );
+  
+  if (line) {
+    const match = line.match(/opencode\/[a-z0-9-]+/i);
+    if (match) {
+      return match[0].toLowerCase();
+    }
+  }
+  
+  return 'opencode/minimax-m2.5-free';
+}
 
 export async function generatePlanWithMiniMax(task: string): Promise<PlanResult> {
   logger.info(`[MiniMax] Generating plan for: ${task.substring(0, 50)}...`);
@@ -96,7 +168,7 @@ export async function generatePlanWithMiniMax(task: string): Promise<PlanResult>
       } catch (e) {
         resolve({
           plan: task,
-          recommendedModel: 'MiniMax-M2.5',
+          recommendedModel: 'opencode/minimax-m2.5-free',
           projectName: `proyecto-${Date.now()}`,
           steps: [task]
         });
@@ -108,7 +180,7 @@ export async function generatePlanWithMiniMax(task: string): Promise<PlanResult>
       logger.error(`[MiniMax] Error:`, err);
       resolve({
         plan: task,
-        recommendedModel: 'MiniMax-M2.5',
+        recommendedModel: 'opencode/minimax-m2.5-free',
         projectName: `proyecto-${Date.now()}`,
         steps: [task]
       });
@@ -118,7 +190,7 @@ export async function generatePlanWithMiniMax(task: string): Promise<PlanResult>
       proc.kill('SIGTERM');
       resolve({
         plan: task,
-        recommendedModel: 'MiniMax-M2.5',
+        recommendedModel: 'opencode/minimax-m2.5-free',
         projectName: `proyecto-${Date.now()}`,
         steps: [task]
       });
@@ -130,7 +202,7 @@ function parsePlanOutput(output: string): PlanResult {
   const lines = output.split('\n');
   
   let projectName = `proyecto-${Date.now()}`;
-  let recommendedModel = 'MiniMax-M2.5';
+  let recommendedModel = 'opencode/minimax-m2.5-free';
   const steps: string[] = [];
   let planDetail = '';
   let inPlan = false;
@@ -139,16 +211,21 @@ function parsePlanOutput(output: string): PlanResult {
     const trimmed = line.trim();
     
     if (trimmed.startsWith('PROYECTO:')) {
-      projectName = trimmed.substring(9).trim().toLowerCase().replace(/\s+/g, '-');
-    } else if (trimmed.startsWith('MODELO_RECOMENDADO:')) {
-      recommendedModel = trimmed.substring(19).trim();
-    } else if (trimmed.startsWith('PASOS:') || trimmed.match(/^\d+\./)) {
-      if (trimmed.match(/^\d+\.\s*(.+)/)) {
-        steps.push(trimmed.match(/^\d+\.\s*(.+)/)![1]);
+      projectName = trimmed.substring(9).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      if (!projectName) projectName = `proyecto-${Date.now()}`;
+    } else if (trimmed.startsWith('MODELO:')) {
+      const model = trimmed.substring(7).trim();
+      if (model.includes('opencode/') || model.includes('mimo') || model.includes('pickle') || model.includes('nemotron')) {
+        recommendedModel = model.toLowerCase();
       }
-    } else if (trimmed === 'PLAN_DETALLADO:') {
+    } else if (trimmed.match(/^\d+\.\s*(.+)/)) {
+      const step = trimmed.match(/^\d+\.\s*(.+)/)![1];
+      if (step && !step.includes('MODELO') && !step.includes('PROYECTO')) {
+        steps.push(step);
+      }
+    } else if (trimmed === 'PLAN_DETALLADO:' || trimmed === '---') {
       inPlan = true;
-    } else if (inPlan && trimmed && !trimmed.startsWith('#')) {
+    } else if (inPlan && trimmed && !trimmed.startsWith('#') && !trimmed.includes('MODELO')) {
       planDetail += trimmed + '\n';
     }
   }
@@ -171,12 +248,11 @@ export async function runOpenCodeTask(
   model?: string,
   timeoutMs: number = 180000
 ): Promise<OpenCodeResult> {
-  logger.info(`[OpenCode] Executing: ${task.substring(0, 50)}...`);
+  const modelToUse = model || 'opencode/minimax-m2.5-free';
+  logger.info(`[OpenCode] Executing with ${modelToUse}: ${task.substring(0, 50)}...`);
 
   return new Promise((resolve) => {
-    const args = model 
-      ? ['run', '--model', model, task]
-      : ['run', task];
+    const args = ['run', '--model', modelToUse, task];
 
     const proc = spawn('opencode', args, {
       cwd: projectPath,
@@ -196,12 +272,10 @@ export async function runOpenCodeTask(
     proc.stdout?.on('data', (data: Buffer) => {
       const text = data.toString();
       output += text;
-      logger.info(`[OpenCode] ${text.trim().substring(0, 100)}`);
     });
 
     proc.stderr?.on('data', (data: Buffer) => {
       errorOutput += data.toString();
-      logger.warn(`[OpenCode Error] ${data.toString().trim().substring(0, 100)}`);
     });
 
     proc.on('close', (code) => {
