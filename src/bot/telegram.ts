@@ -9,13 +9,10 @@ import { writeFile, unlink } from 'fs/promises';
 
 function detectAudioExtension(audioBuffer: Buffer): 'mp3' | 'wav' | 'ogg' {
   if (audioBuffer.length >= 4) {
-    const header = audioBuffer.subarray(0, 4).toString('ascii');
-    if (header === 'RIFF') return 'wav';
-    if (header === 'OggS') return 'ogg';
-  }
-
-  if (audioBuffer.length >= 3 && audioBuffer.subarray(0, 3).toString('ascii') === 'ID3') {
-    return 'mp3';
+    const header = Buffer.from(audioBuffer.subarray(0, 4)).toString('ascii');
+    if (header.startsWith('RIFF')) return 'wav';
+    if (header.startsWith('OggS')) return 'ogg';
+    if (header.startsWith('ID3')) return 'mp3';
   }
 
   if (audioBuffer.length >= 2 && audioBuffer[0] === 0xff && (audioBuffer[1] & 0xe0) === 0xe0) {
