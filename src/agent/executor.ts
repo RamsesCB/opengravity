@@ -136,8 +136,7 @@ Reglas:
     this.log('Asking OpenCode to generate plan...');
 
     const result = await runOpenCode(planningPrompt, this.projectPath, {
-      timeout: 120000,
-      model: config.OPENCODE_DEFAULT_MODEL
+      timeout: 120000
     });
 
     if (!result.success && result.exitCode === 124) {
@@ -183,8 +182,7 @@ Reglas:
       this.log(`Executing step ${step.id}/${this.steps.length}: ${step.description}`);
 
       const result = await runOpenCode(step.prompt, this.projectPath, {
-        timeout: DEFAULT_TIMEOUT,
-        model: config.OPENCODE_DEFAULT_MODEL
+        timeout: DEFAULT_TIMEOUT
       });
 
       step.output = result.output;

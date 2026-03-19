@@ -26,15 +26,10 @@ export async function runOpenCode(
 ): Promise<OpenCodeResult> {
   const timeout = options?.timeout || config.OPENCODE_TIMEOUT;
   const workdir = options?.workdir || projectPath;
-  const model = options?.model;
   
   let fullTask = taskDescription;
 
   const args: string[] = ['run'];
-  
-  if (model) {
-    args.push('--model', model);
-  }
   
   if (options?.continue) {
     args.push('--continue');
@@ -42,7 +37,7 @@ export async function runOpenCode(
   
   args.push(fullTask);
 
-  logger.info(`[OpenCode] Running task in ${workdir} with model ${model || 'default'}: ${taskDescription.substring(0, 100)}...`);
+  logger.info(`[OpenCode] Running task in ${workdir}: ${taskDescription.substring(0, 100)}...`);
 
   const openCodeCmd = config.OPENCODE_COMMAND || 'opencode';
 
