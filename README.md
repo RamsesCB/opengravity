@@ -1,6 +1,6 @@
 # 🤖 OpenGRBC
 
-> **AI-Powered Telegram Bot** with Triple LLM Fallback System
+> **AI-Powered Telegram Bot** with Triple LLM Fallback System and OpenCode Integration
 
 <div align="center">
 
@@ -8,7 +8,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green?logo=node.js)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**High-Availability AI Bot** | Groq → Gemini → OpenRouter
+**High-Availability AI Bot** | Groq → Gemini → OpenRouter → OpenCode
 
 </div>
 
@@ -20,7 +20,7 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 
 ### Why OpenGRBC?
 
-- **Resilient**: Triple LLM fallback (Groq → Gemini Flash → OpenRouter)
+- **Resilient**: Quad LLM fallback (Groq → Gemini Flash → OpenRouter → OpenCode/MiniMax M2.5)
 - **Voice-Ready**: Full voice message support with ElevenLabs or Qwen3-TTS (local)
 - **Memory**: Persistent conversation history via Firebase Firestore
 - **Secure**: Whitelist-based access control
@@ -32,13 +32,14 @@ OpenGRBC is an intelligent Telegram bot powered by multiple Large Language Model
 
 | Feature | Description |
 |---------|-------------|
-| 🤖 **Triple LLM Fallback** | Groq → Gemini Flash → OpenRouter automatic failover |
+| 🤖 **Quad LLM Fallback** | Groq → Gemini Flash → OpenRouter → OpenCode/MiniMax M2.5 |
 | 🎤 **Voice Messages** | Send voice, receive voice responses |
 | 🔊 **TTS Options** | Local: Qwen3-TTS (GPU) \| Production: text2wav (npm) |
 | 💾 **Persistent Memory** | Firebase Firestore stores conversation history |
 | 🔒 **Access Control** | Whitelist-only user access |
 | 📝 **Tool Calling** | Execute functions and tools via AI |
 | 🖥️ **Flexible Deployment** | Local (polling) or Cloud (webhooks) |
+| 🤖 **OpenCode Agent** | AI coding agent with MiniMax M2.5 for advanced tasks |
 
 ---
 
@@ -387,6 +388,7 @@ The system automatically handles provider failures:
 | 1️⃣ | **Groq** | llama-3.3-70b-versatile | Primary (always first) |
 | 2️⃣ | **Gemini** | gemini-1.5-flash | Groq rate limit (429) or unavailable |
 | 3️⃣ | **OpenRouter** | gemini-flash-1.5-8b | Gemini failure |
+| 4️⃣ | **OpenCode** | minimax-m2.5 | All providers unavailable |
 
 ### Token Optimization
 
@@ -404,7 +406,14 @@ OpenGRBC/
 │   ├── agent/           # AI Agent logic
 │   │   ├── llm.ts      # LLM with triple fallback
 │   │   ├── loop.ts     # Main agent loop
-│   │   └── prompt.ts   # System prompt
+│   │   ├── prompt.ts   # System prompt
+│   │   ├── orchestrator.ts      # Task orchestration
+│   │   ├── router.ts          # Request routing
+│   │   ├── executor.ts        # Task execution
+│   │   ├── opencode_client.ts # OpenCode AI client
+│   │   ├── opencode_acp_server.ts # ACP server
+│   │   ├── orchestrator_telegram.ts # Telegram integration
+│   │   └── local_models.ts    # Local model support
 │   ├── bot/            # Telegram bot handlers
 │   ├── config.ts       # Configuration
 │   ├── memory/         # Firestore memory
