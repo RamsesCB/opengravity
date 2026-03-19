@@ -126,15 +126,20 @@ async function processOrchestratedTask(userId: string, task: string, ctx?: any):
     let summary = '';
     if (result.success) {
       summary = `✅ *Tarea completada exitosamente*\n\n`;
-      summary += `📁 Proyecto: \`${result.projectName}\`\n\n`;
-      summary += `*Output:*\n\`\`\`\n${result.output.substring(0, 1000)}\n\`\`\``;
+      summary += `📁 Proyecto: \`${result.projectName}\`\n`;
+      if (result.planModel) {
+        summary += `🤖 Modelo usado: \`${result.planModel}\`\n`;
+      }
+      summary += `\n*Resumen:* ${result.summary}`;
     } else {
       summary = `⚠️ *Tarea completada con errores*\n\n`;
-      summary += `📁 Proyecto: \`${result.projectName}\`\n\n`;
-      if (result.errors.length > 0) {
-        summary += `❌ Errores:\n${result.errors.map(e => `- ${e}`).join('\n')}`;
+      summary += `📁 Proyecto: \`${result.projectName}\`\n`;
+      if (result.planModel) {
+        summary += `🤖 Modelo usado: \`${result.planModel}\`\n`;
       }
-      summary += `\n\n*Output parcial:*\n\`\`\`\n${result.output.substring(0, 500)}\n\`\`\``;
+      if (result.errors.length > 0) {
+        summary += `\n❌ Errores:\n${result.errors.map(e => `- ${e}`).join('\n')}`;
+      }
     }
 
     await memory.addMessage(userId, 'assistant', summary);

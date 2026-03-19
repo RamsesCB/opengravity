@@ -14,8 +14,9 @@ export interface OrchestratorResult {
   summary: string;
   state: string;
   output: string;
-  errors: string[];
+  planModel?: string;
   projectName: string;
+  errors: string[];
 }
 
 export class Orchestrator {
@@ -52,8 +53,9 @@ export class Orchestrator {
         summary: result.summary,
         state: result.state,
         output: result.output,
-        errors: result.errors,
-        projectName: this.projectName
+        planModel: result.plan?.recommendedModel,
+        projectName: this.projectName,
+        errors: result.errors
       };
     } catch (error: any) {
       logger.error('[Orchestrator] Execution failed:', error);
@@ -62,8 +64,8 @@ export class Orchestrator {
         summary: error.message,
         state: 'failed',
         output: '',
-        errors: [error.message],
-        projectName: this.projectName
+        projectName: this.projectName,
+        errors: [error.message]
       };
     }
   }
