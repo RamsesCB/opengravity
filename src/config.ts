@@ -48,4 +48,14 @@ export const config = {
   ELEVENLABS_VOICE_ID: getEnv('ELEVENLABS_VOICE_ID', false, 'IKne3meq5aSn9XLyUdCD'),
   
   MAX_ITERATIONS: 10,
+  
+  // Local Orchestrator Configuration
+  LOCAL_PROJECTS_PATH: getEnv('LOCAL_PROJECTS_PATH', false, '/home/slerx/Datos/Proyectos'),
+  SKILLS_PATH: getEnv('SKILLS_PATH', false, '/home/slerx/Datos/Proyectos/Skills_Engramd'),
+  PLAN_STRUCTURE_PATH: getEnv('PLAN_STRUCTURE_PATH', false, '/home/slerx/Datos/Proyectos/Plan_structure.md'),
+  ERROR_STRUCTURE_PATH: getEnv('ERROR_STRUCTURE_PATH', false, '/home/slerx/Datos/Proyectos/Error_structure.md'),
+  
+  // OpenCode Configuration
+  OPENCODE_COMMAND: getEnv('OPENCODE_COMMAND', false, 'opencode'),
+  OPENCODE_TIMEOUT: getEnvNumber('OPENCODE_TIMEOUT', 300000),
 };

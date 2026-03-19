@@ -2,6 +2,9 @@ import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { processUserMessage } from '../agent/loop.js';
+import { stopACPServerAndCleanup } from '../agent/orchestrator.js';
+import { getACPServer } from '../agent/opencode_acp_server.js';
+import { formatACPServerStopped } from '../agent/orchestrator_telegram.js';
 import { textToSpeech, setVoiceEnabled, isVoiceEnabled, isAutoRespondEnabled, getVoiceSettings, isConfigured } from '../tts/elevenlabs.js';
 import { transcribeAudio, isAudioSizeValid, formatAudioSize } from '../transcription/whisper.js';
 import { tmpdir } from 'os';
@@ -55,6 +58,34 @@ bot.use(async (ctx, next) => {
 
 bot.command('start', (ctx) => {
   ctx.reply("Hola, soy OpenGravity. Tu agente personal. ¿En qué puedo ayudarte?");
+});
+
+bot.command('stop', async (ctx) => {
+  logger.info('Stop command received');
+  
+  const server = getACPServer();
+  if (!server) {
+    await ctx.reply('🛑 No hay servidor ACP activo.\n\nUsa /ejecutar para iniciar uno.');
+    return;
+  }
+  
+  await stopACPServerAndCleanup();
+  
+  const message = formatACPServerStopped();
+  
+  if (isVoiceEnabled(ctx.from?.id?.toString() || '')) {
+    try {
+      const audioBuffer = await textToSpeech(message);
+      if (audioBuffer) {
+        await sendTtsAudio(ctx, audioBuffer);
+        return;
+      }
+    } catch (error) {
+      logger.error('Error sending voice:', error);
+    }
+  }
+  
+  await ctx.reply(message);
 });
 
 bot.command('transcribe', async (ctx) => {
@@ -201,7 +232,7 @@ bot.on('message:voice', async (ctx) => {
       return;
     }
     
-    const reply = await processUserMessage(userId, transcription);
+    const reply = await processUserMessage(userId, transcription, ctx);
     
     if (reply) {
       if (isAutoRespondEnabled(userId) && isVoiceEnabled(userId)) {
@@ -229,7 +260,7 @@ bot.on('message:text', async (ctx) => {
   await ctx.api.sendChatAction(ctx.chat.id, 'typing');
 
   try {
-    const reply = await processUserMessage(userId, text);
+    const reply = await processUserMessage(userId, text, ctx);
     if (reply) {
       if (isAutoRespondEnabled(userId) && isVoiceEnabled(userId)) {
         await sendVoiceReply(ctx, reply);
