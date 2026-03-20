@@ -5,7 +5,7 @@ export interface LocalModel {
   name: string;
   type: ModelType;
   description: string;
-  opencodeModel: string;
+  skills: string[];
 }
 
 export const LOCAL_MODELS: LocalModel[] = [
@@ -14,28 +14,28 @@ export const LOCAL_MODELS: LocalModel[] = [
     name: 'MiniMax M2.5',
     type: 'architect',
     description: 'System Design, lógica compleja, documentos y presentaciones',
-    opencodeModel: 'ollama/qwen3.5:9b',
+    skills: ['api-rest-design', 'architecture-guardrails', 'documentation-standards'],
   },
   {
     id: 'nemotron_3_super',
     name: 'Nemotron-3 Super',
     type: 'agent',
     description: 'Tool Calling de alta precisión, APIs y flujos empresariales',
-    opencodeModel: 'ollama/qwen3.5:9b',
+    skills: ['api-rest-design', 'ci-cd-pipeline', 'security-checklist'],
   },
   {
     id: 'mimo_v2_flash',
     name: 'MiMo v2 Flash',
     type: 'fast_logic',
     description: 'Programación rápida, Flutter/Dart/JS, autocompletado, razonamiento matemático',
-    opencodeModel: 'ollama/qwen3.5:9b',
+    skills: ['performance-rules', 'testing-coverage', 'code-review-checklist'],
   },
   {
     id: 'big_pickle',
     name: 'Big Pickle',
     type: 'auditor',
     description: 'Code Review de archivos extensos, debugging profundo, documentación técnica',
-    opencodeModel: 'ollama/qwen3.5:9b',
+    skills: ['code-review-checklist', 'security-checklist', 'testing-coverage'],
   },
 ];
 

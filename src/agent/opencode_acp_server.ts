@@ -38,14 +38,14 @@ export class ACPServer extends EventEmitter {
   private activeTaskProcess: ChildProcess | null = null;
   private port: number = 4096;
   private projectPath: string;
-  private model: string;
+  private model?: string;
   private running: boolean = false;
   private answerQueue: string[] = [];
   private timeoutId: NodeJS.Timeout | null = null;
   private readonly TIMEOUT_MS: number = 30 * 60 * 1000;
   private readonly MAX_TASK_CHARS: number = 600;
 
-  constructor(projectPath: string, model: string, port: number = 4096) {
+  constructor(projectPath: string, model?: string, port: number = 4096) {
     super();
     this.projectPath = projectPath;
     this.model = model;
@@ -198,7 +198,7 @@ export class ACPServer extends EventEmitter {
       const compactTask = this.compactTask(task);
       
       const openCodeCommand = config.OPENCODE_COMMAND || 'opencode';
-      const args = ['run', '-m', this.model, compactTask];
+      const args = this.model ? ['run', '-m', this.model, compactTask] : ['run', compactTask];
       logger.info(`[ACP] Running task (${compactTask.length} chars): ${compactTask.substring(0, 100)}...`);
 
       const proc = spawn(openCodeCommand, args, {
